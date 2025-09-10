@@ -1,0 +1,104 @@
+<div class="dashboard-container">
+  <!-- Header -->
+  <header class="dashboard-header">
+    <div class="header-content">
+      <div class="header-left">
+        <h1>Sistema de Certificados</h1>
+        <div class="welcome-message">
+          <span class="greeting">{{ getGreeting() }},</span>
+          <span class="user-name">{{ currentUser()?.name }}</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="time-info">
+          <div class="current-time">{{ formatTime() }}</div>
+          <div class="current-date">{{ formatDate() }}</div>
+        </div>
+        <button class="btn btn-logout" (click)="logout()">
+          Cerrar Sesión
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="dashboard-main">
+    <div class="dashboard-content">
+      <div class="welcome-card">
+        <div class="welcome-icon">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 12l2 2 4-4"/>
+            <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+            <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+            <path d="M12 3c0 1-1 3-3 3s-3-2-3-3 1-3 3-3 3 2 3 3"/>
+            <path d="M12 21c0-1 1-3 3-3s3 2 3 3-1 3-3 3-3-2-3-3"/>
+          </svg>
+        </div>
+        <h2>¡Bienvenido al Sistema!</h2>
+        <p>Has iniciado sesión correctamente. Aquí puedes gestionar todos tus certificados y actividades.</p>
+
+        <div class="user-info">
+          <div class="info-item">
+            <strong>Email:</strong> {{ currentUser()?.email }}
+          </div>
+          <div class="info-item" *ngIf="currentUser()?.company_id">
+            <strong>Empresa ID:</strong> {{ currentUser()?.company_id }}
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <h3>Acciones Rápidas</h3>
+        <div class="actions-grid">
+          <div class="action-card">
+            <div class="action-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14,2 14,8 20,8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10,9 9,9 8,9"/>
+              </svg>
+            </div>
+            <h4>Certificados</h4>
+            <p>Gestiona tus certificados</p>
+          </div>
+
+          <div class="action-card">
+            <div class="action-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+              </svg>
+            </div>
+            <h4>Plantillas</h4>
+            <p>Administra plantillas</p>
+          </div>
+
+          <div class="action-card">
+            <div class="action-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <h4>Usuarios</h4>
+            <p>Gestiona usuarios</p>
+          </div>
+
+          <div class="action-card">
+            <div class="action-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3h18v18H3zM9 9h6v6H9z"/>
+              </svg>
+            </div>
+            <h4>Reportes</h4>
+            <p>Ver estadísticas</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
