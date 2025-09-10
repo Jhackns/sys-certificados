@@ -1,32 +1,23 @@
 import { Component, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
-import { SidebarComponent } from '../../../shared/components/sidebar/sidebar.component';
 
 @Component({
-  selector: 'app-principal',
+  selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, SidebarComponent],
-  templateUrl: './principal.component.html',
-  styleUrl: './principal.component.css'
+  imports: [CommonModule],
+  templateUrl: './home.component.html',
+  styleUrl: './home.component.css'
 })
-export class PrincipalComponent {
+export class HomeComponent {
   currentTime = signal(new Date());
   currentUser = computed(() => this.authService.currentUser());
 
-  constructor(
-    private authService: AuthService,
-    private router: Router
-  ) {
+  constructor(private authService: AuthService) {
     // Actualizar la hora cada minuto
     setInterval(() => {
       this.currentTime.set(new Date());
     }, 60000);
-  }
-
-  logout(): void {
-    this.authService.logout();
   }
 
   getGreeting(): string {

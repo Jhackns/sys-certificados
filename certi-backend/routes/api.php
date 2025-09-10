@@ -50,7 +50,7 @@ Route::prefix('public')->group(function () {
     // Información básica de empresas (para formularios públicos)
     Route::get('/companies', [CompanyController::class, 'index']);
     Route::get('/companies/{id}', [CompanyController::class, 'show']);
-    
+
     // Actividades públicas por empresa
     Route::get('/companies/{companyId}/activities', [ActivityController::class, 'byCompany']);
 });
@@ -63,7 +63,7 @@ Route::prefix('public')->group(function () {
 */
 
 Route::middleware('auth:sanctum')->group(function () {
-    
+
     /*
     |--------------------------------------------------------------------------
     | AUTENTICACIÓN Y PERFIL
@@ -82,8 +82,6 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     | Gestión de usuarios, roles y permisos con middleware de permisos
     */
-
-    // === GESTIÓN DE USUARIOS ===
 
     // === GESTIÓN DE USUARIOS ===
     Route::prefix('users')->middleware('permission:users.read')->group(function () {
@@ -200,24 +198,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/certificate/{certificateId}', [ValidationController::class, 'byCertificate']);
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | GESTIÓN DE PLANTILLAS DE CERTIFICADOS
-    |--------------------------------------------------------------------------
-    | CRUD de plantillas con funcionalidades avanzadas
-    */
-    Route::prefix('certificate-templates')->middleware('permission:template_read')->group(function () {
-        Route::get('/', [CertificateTemplateController::class, 'index']);
-        Route::get('/{id}', [CertificateTemplateController::class, 'show']);
-        Route::post('/', [CertificateTemplateController::class, 'store'])->middleware('permission:template_create');
-        Route::put('/{id}', [CertificateTemplateController::class, 'update'])->middleware('permission:template_update');
-        Route::delete('/{id}', [CertificateTemplateController::class, 'destroy'])->middleware('permission:template_delete');
-
-        // Funcionalidades adicionales
-        Route::patch('/{id}/toggle-status', [CertificateTemplateController::class, 'toggleStatus'])->middleware('permission:template_update');
-        Route::get('/company/{companyId}', [CertificateTemplateController::class, 'byCompany']);
-        Route::post('/{id}/clone', [CertificateTemplateController::class, 'clone'])->middleware('permission:template_create');
-    });
 
     Route::get('/user', function (Request $request) {
         return $request->user();

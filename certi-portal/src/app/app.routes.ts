@@ -14,9 +14,50 @@ export const routes: Routes = [
     canActivate: [GuestGuard]
   },
   {
+    path: 'register',
+    loadComponent: () => import('./features/auth/register/register.component').then(m => m.RegisterComponent),
+    canActivate: [GuestGuard]
+  },
+  {
     path: 'principal',
     loadComponent: () => import('./features/dashboard/principal/principal.component').then(m => m.PrincipalComponent),
-    canActivate: [AuthGuard]
+    canActivate: [AuthGuard],
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./features/dashboard/home/home.component').then(m => m.HomeComponent)
+      },
+      {
+        path: 'usuarios',
+        loadComponent: () => import('./features/management/users/users.component').then(m => m.UsersComponent)
+      },
+      {
+        path: 'roles',
+        loadComponent: () => import('./features/management/roles/roles.component').then(m => m.RolesComponent)
+      }
+    ]
+  },
+  {
+    path: 'usuarios',
+    loadComponent: () => import('./features/dashboard/principal/principal.component').then(m => m.PrincipalComponent),
+    canActivate: [AuthGuard],
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./features/management/users/users.component').then(m => m.UsersComponent)
+      }
+    ]
+  },
+  {
+    path: 'roles',
+    loadComponent: () => import('./features/dashboard/principal/principal.component').then(m => m.PrincipalComponent),
+    canActivate: [AuthGuard],
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./features/management/roles/roles.component').then(m => m.RolesComponent)
+      }
+    ]
   },
   {
     path: '404',

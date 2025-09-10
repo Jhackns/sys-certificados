@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, tap, catchError, of } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { User, LoginRequest, LoginResponse, AuthState, ApiResponse, ProfileResponse } from '../models/user.model';
+import { User, LoginRequest, RegisterRequest, LoginResponse, AuthState, ApiResponse, ProfileResponse } from '../models/user.model';
 
 @Injectable({
   providedIn: 'root'
@@ -57,11 +57,16 @@ export class AuthService {
    * Realiza el login del usuario
    */
   login(credentials: LoginRequest): Observable<LoginResponse> {
+    console.log('Iniciando login con:', credentials);
     return this.http.post<LoginResponse>(`${this.API_URL}/auth/login`, credentials)
       .pipe(
         tap(response => {
+          console.log('Respuesta del servidor:', response);
           if (response.success && response.data) {
-            this.setAuth(response.data.user, response.data.token);
+            console.log('Login exitoso, estableciendo autenticación');
+            this.setAuth(response.data.user, response.data.access_token);
+          } else {
+            console.log('Login falló:', response.message);
           }
         }),
         catchError(error => {
@@ -69,7 +74,34 @@ export class AuthService {
           return of({
             success: false,
             message: 'Error en el servidor',
-            data: { user: null as any, token: '' }
+            data: { user: null as any, access_token: '', token_type: '', roles: [], permissions: [], company: null, email_verified: false }
+          });
+        })
+      );
+  }
+
+  /**
+   * Registra un nuevo usuario
+   */
+  register(userData: RegisterRequest): Observable<LoginResponse> {
+    console.log('Iniciando registro con:', userData);
+    return this.http.post<LoginResponse>(`${this.API_URL}/auth/register`, userData)
+      .pipe(
+        tap(response => {
+          console.log('Respuesta del servidor:', response);
+          if (response.success && response.data) {
+            console.log('Registro exitoso, estableciendo autenticación');
+            this.setAuth(response.data.user, response.data.access_token);
+          } else {
+            console.log('Registro falló:', response.message);
+          }
+        }),
+        catchError(error => {
+          console.error('Error en registro:', error);
+          return of({
+            success: false,
+            message: 'Error en el servidor',
+            data: { user: null as any, access_token: '', token_type: '', roles: [], permissions: [], company: null, email_verified: false }
           });
         })
       );
@@ -108,6 +140,7 @@ export class AuthService {
    * Establece el estado de autenticación
    */
   private setAuth(user: User, token: string): void {
+    console.log('Estableciendo autenticación para usuario:', user.name);
     localStorage.setItem(this.TOKEN_KEY, token);
     localStorage.setItem(this.USER_KEY, JSON.stringify(user));
 
@@ -116,6 +149,7 @@ export class AuthService {
       user,
       token
     });
+    console.log('Estado de autenticación actualizado:', this.authState());
   }
 
   /**
@@ -140,10 +174,9 @@ export class AuthService {
     if (!token) return false;
 
     try {
-      // Decodificar el JWT para verificar expiración
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const currentTime = Date.now() / 1000;
-      return payload.exp > currentTime;
+      // Para tokens de Sanctum, simplemente verificar que existe
+      // Los tokens de Sanctum no son JWT, son tokens opacos
+      return token.length > 0;
     } catch {
       return false;
     }

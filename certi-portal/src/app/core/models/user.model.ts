@@ -12,12 +12,26 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+  password_confirmation: string;
+  company_id?: number | null;
+  role: string;
+}
+
 export interface LoginResponse {
   success: boolean;
   message: string;
   data: {
     user: User;
-    token: string;
+    access_token: string;
+    token_type: string;
+    roles: string[];
+    permissions: string[];
+    company: any;
+    email_verified: boolean;
   };
 }
 
