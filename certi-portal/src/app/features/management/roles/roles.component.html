@@ -32,7 +32,7 @@
           <span class="count-number">{{ roles().length }}</span>
           <span class="count-label">roles configurados</span>
         </div>
-        <button class="btn btn-primary">
+        <button class="btn btn-primary" (click)="openCreateModal()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
@@ -51,9 +51,8 @@
               </svg>
             </div>
             <div class="role-actions">
-              <button class="btn btn-sm btn-outline">Ver</button>
-              <button class="btn btn-sm btn-outline">Editar</button>
-              <button class="btn btn-sm btn-danger">Eliminar</button>
+              <button class="btn btn-sm btn-outline" (click)="openEditModal(role)">Editar</button>
+              <button class="btn btn-sm btn-danger" (click)="openDeleteModal(role)">Eliminar</button>
             </div>
           </div>
 
@@ -69,6 +68,14 @@
               <div class="meta-item">
                 <span class="meta-label">Nombre:</span>
                 <span class="meta-value">{{ role.name }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Permisos:</span>
+                <span class="meta-value">{{ role.permissions_count || 0 }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Usuarios:</span>
+                <span class="meta-value">{{ role.users_count || 0 }}</span>
               </div>
               <div class="meta-item">
                 <span class="meta-label">Creado:</span>
@@ -89,8 +96,174 @@
         </div>
         <h3>No hay roles configurados</h3>
         <p>Comienza creando el primer rol del sistema</p>
-        <button class="btn btn-primary">Crear Rol</button>
+        <button class="btn btn-primary" (click)="openCreateModal()">Crear Rol</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Success Message -->
+<div *ngIf="successMessage()" class="success-message">
+  {{ successMessage() }}
+</div>
+
+<!-- Create Role Modal -->
+<div *ngIf="showCreateModal()" class="modal-overlay" (click)="closeModals()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Crear Nuevo Rol</h3>
+      <button class="modal-close" (click)="closeModals()">&times;</button>
+    </div>
+
+    <form [formGroup]="roleForm" (ngSubmit)="createRole()" class="modal-form">
+      <div class="form-group">
+        <label for="name">Nombre del Rol</label>
+        <input
+          type="text"
+          id="name"
+          formControlName="name"
+          class="form-control"
+          [class.error]="getFieldError('name')"
+          placeholder="ej: editor_contenido"
+        />
+        <div class="error-message" *ngIf="getFieldError('name')">
+          {{ getFieldError('name') }}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="guard_name">Guard</label>
+        <select
+          id="guard_name"
+          formControlName="guard_name"
+          class="form-control"
+        >
+          <option value="web">Web</option>
+          <option value="api">API</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Permisos</label>
+        <div class="permissions-container">
+          <div *ngFor="let group of getPermissionsGrouped()" class="permission-group">
+            <h4 class="group-title">{{ group.key | titlecase }}</h4>
+            <div class="checkbox-group">
+              <label *ngFor="let permission of group.value" class="checkbox-label">
+                <input
+                  type="checkbox"
+                  [value]="permission.name"
+                  (change)="onPermissionChange($event, permission.name)"
+                  [checked]="roleForm.get('permissions')?.value?.includes(permission.name)"
+                />
+                <span>{{ permission.action | titlecase }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" (click)="closeModals()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" [disabled]="roleForm.invalid || isLoading()">
+          {{ isLoading() ? 'Creando...' : 'Crear Rol' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Role Modal -->
+<div *ngIf="showEditModal()" class="modal-overlay" (click)="closeModals()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Editar Rol</h3>
+      <button class="modal-close" (click)="closeModals()">&times;</button>
+    </div>
+
+    <form [formGroup]="roleForm" (ngSubmit)="updateRole()" class="modal-form">
+      <div class="form-group">
+        <label for="edit-name">Nombre del Rol</label>
+        <input
+          type="text"
+          id="edit-name"
+          formControlName="name"
+          class="form-control"
+          [class.error]="getFieldError('name')"
+          placeholder="ej: editor_contenido"
+        />
+        <div class="error-message" *ngIf="getFieldError('name')">
+          {{ getFieldError('name') }}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="edit-guard_name">Guard</label>
+        <select
+          id="edit-guard_name"
+          formControlName="guard_name"
+          class="form-control"
+        >
+          <option value="web">Web</option>
+          <option value="api">API</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Permisos</label>
+        <div class="permissions-container">
+          <div *ngFor="let group of getPermissionsGrouped()" class="permission-group">
+            <h4 class="group-title">{{ group.key | titlecase }}</h4>
+            <div class="checkbox-group">
+              <label *ngFor="let permission of group.value" class="checkbox-label">
+                <input
+                  type="checkbox"
+                  [value]="permission.name"
+                  (change)="onPermissionChange($event, permission.name)"
+                  [checked]="roleForm.get('permissions')?.value?.includes(permission.name)"
+                />
+                <span>{{ permission.action | titlecase }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" (click)="closeModals()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" [disabled]="roleForm.invalid || isLoading()">
+          {{ isLoading() ? 'Actualizando...' : 'Actualizar Rol' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Role Modal -->
+<div *ngIf="showDeleteModal()" class="modal-overlay" (click)="closeModals()">
+  <div class="modal-content delete-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Eliminar Rol</h3>
+      <button class="modal-close" (click)="closeModals()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="warning-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <p>¿Estás seguro de que quieres eliminar el rol <strong>{{ selectedRole()?.name }}</strong>?</p>
+      <p class="warning-text">Esta acción no se puede deshacer.</p>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-outline" (click)="closeModals()">Cancelar</button>
+      <button type="button" class="btn btn-danger" (click)="deleteRole()" [disabled]="isLoading()">
+        {{ isLoading() ? 'Eliminando...' : 'Eliminar Rol' }}
+      </button>
     </div>
   </div>
 </div>

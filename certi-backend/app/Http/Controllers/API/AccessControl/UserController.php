@@ -24,6 +24,11 @@ class UserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // Solo el super_admin puede listar usuarios
+        if (!$request->user()->hasRole('super_admin')) {
+            return $this->forbiddenResponse('Solo el super admin puede listar usuarios');
+        }
+
         try {
             $query = User::with(['company', 'roles']);
 
@@ -92,6 +97,11 @@ class UserController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        // Solo el super_admin puede crear usuarios
+        if (!$request->user()->hasRole('super_admin')) {
+            return $this->forbiddenResponse('Solo el super admin puede crear usuarios');
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -133,6 +143,11 @@ class UserController extends Controller
      */
     public function update(Request $request, int $id): JsonResponse
     {
+        // Solo el super_admin puede actualizar usuarios
+        if (!$request->user()->hasRole('super_admin')) {
+            return $this->forbiddenResponse('Solo el super admin puede actualizar usuarios');
+        }
+
         try {
             $user = User::findOrFail($id);
 
@@ -178,6 +193,11 @@ class UserController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
+        // Solo el super_admin puede eliminar usuarios
+        if (!auth()->user()->hasRole('super_admin')) {
+            return $this->forbiddenResponse('Solo el super admin puede eliminar usuarios');
+        }
+
         try {
             $user = User::findOrFail($id);
             
@@ -203,6 +223,11 @@ class UserController extends Controller
      */
     public function assignRoles(Request $request, int $id): JsonResponse
     {
+        // Solo el super_admin puede asignar roles
+        if (!$request->user()->hasRole('super_admin')) {
+            return $this->forbiddenResponse('Solo el super admin puede asignar roles');
+        }
+
         $validator = Validator::make($request->all(), [
             'roles' => 'required|array',
             'roles.*' => 'exists:roles,name',
@@ -231,6 +256,11 @@ class UserController extends Controller
      */
     public function availableRoles(): JsonResponse
     {
+        // Solo el super_admin puede ver roles disponibles
+        if (!auth()->user()->hasRole('super_admin')) {
+            return $this->forbiddenResponse('Solo el super admin puede ver roles disponibles');
+        }
+
         try {
             $roles = Role::all(['id', 'name']);
 

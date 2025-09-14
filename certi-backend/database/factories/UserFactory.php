@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Company;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -30,7 +29,6 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('SecurePassword123!'),
             'remember_token' => Str::random(10),
-            'company_id' => Company::factory(),
         ];
     }
 
@@ -41,36 +39,6 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
-        ]);
-    }
-
-    /**
-     * Indicate that the user has no company assigned.
-     */
-    public function withoutCompany(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'company_id' => null,
-        ]);
-    }
-
-    /**
-     * Indicate that the user belongs to a specific company.
-     */
-    public function forCompany(Company $company): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'company_id' => $company->id,
-        ]);
-    }
-
-    /**
-     * Create a user with a specific password (for testing purposes).
-     */
-    public function withPassword(string $password): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'password' => Hash::make($password),
         ]);
     }
 }

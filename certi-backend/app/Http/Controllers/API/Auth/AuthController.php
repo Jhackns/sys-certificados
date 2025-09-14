@@ -15,22 +15,22 @@ use Illuminate\Support\Facades\Validator;
 class AuthController extends Controller
 {
     use ApiResponseTrait;
-    
+
     protected $authService;
-    
+
     /**
      * Constructor
-     * 
+     *
      * @param AuthService $authService
      */
     public function __construct(AuthService $authService)
     {
         $this->authService = $authService;
     }
-    
+
     /**
      * Registrar un nuevo usuario
-     * 
+     *
      * @param Request $request
      * @return JsonResponse
      */
@@ -40,7 +40,6 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'company_id' => 'nullable|exists:companies,id',
             'role' => 'nullable|string|in:super_admin,administrador,emisor,validador,usuario_final',
         ]);
 
@@ -50,11 +49,11 @@ class AuthController extends Controller
 
         try {
             $user = $this->authService->register($validator->validated());
-            
+
             $token = $user->createToken('auth_token')->plainTextToken;
-            
+
             return $this->successResponse([
-                'user' => new UserResource($user->load('company')),
+                'user' => new UserResource($user),
                 'access_token' => $token,
                 'token_type' => 'Bearer',
                 'email_verified' => $user->hasVerifiedEmail(),
@@ -63,10 +62,10 @@ class AuthController extends Controller
             return $this->errorResponse('Error al registrar usuario: ' . $e->getMessage(), 500);
         }
     }
-    
+
     /**
      * Iniciar sesión
-     * 
+     *
      * @param Request $request
      * @return JsonResponse
      */
@@ -86,11 +85,11 @@ class AuthController extends Controller
                 $request->email,
                 $request->password
             );
-            
+
             if (!$result) {
                 return $this->unauthorizedResponse('Credenciales inválidas');
             }
-            
+
             if (isset($result['error']) && $result['error'] === 'inactive_user') {
                 return $this->forbiddenResponse('Usuario inactivo');
             }
@@ -99,7 +98,6 @@ class AuthController extends Controller
                 'user' => new UserResource($result['user']),
                 'roles' => $result['roles'],
                 'permissions' => $result['permissions'],
-                'company' => $result['company'],
                 'access_token' => $result['access_token'],
                 'token_type' => $result['token_type'],
                 'email_verified' => $result['email_verified'],
@@ -111,29 +109,30 @@ class AuthController extends Controller
 
     /**
      * Obtener información del usuario autenticado
-     * 
+     *
      * @param Request $request
      * @return JsonResponse
      */
     public function me(Request $request): JsonResponse
     {
         try {
-            $user = $request->user()->load('company');
-            
+            $user = $request->user();
+            $canManage = $user->hasRole('super_admin');
+
             return $this->successResponse([
                 'user' => new UserResource($user),
                 'roles' => $user->getRoleNames(),
                 'permissions' => $user->getAllPermissions()->pluck('name'),
-                'company' => $user->company,
+                'can_manage_roles_users' => $canManage,
             ], 'Información del usuario obtenida correctamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al obtener información del usuario: ' . $e->getMessage(), 500);
         }
     }
-    
+
     /**
      * Cerrar sesión
-     * 
+     *
      * @param Request $request
      * @return JsonResponse
      */
@@ -141,7 +140,7 @@ class AuthController extends Controller
     {
         try {
             $this->authService->logout($request->user());
-            
+
             return $this->successResponse(null, 'Sesión cerrada correctamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al cerrar sesión: ' . $e->getMessage(), 500);
@@ -150,7 +149,7 @@ class AuthController extends Controller
 
     /**
      * Cerrar todas las sesiones
-     * 
+     *
      * @param Request $request
      * @return JsonResponse
      */
@@ -158,7 +157,7 @@ class AuthController extends Controller
     {
         try {
             $this->authService->logoutAll($request->user());
-            
+
             return $this->successResponse(null, 'Todas las sesiones han sido cerradas');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al cerrar todas las sesiones: ' . $e->getMessage(), 500);
@@ -167,7 +166,7 @@ class AuthController extends Controller
 
     /**
      * Actualizar perfil
-     * 
+     *
      * @param Request $request
      * @return JsonResponse
      */
@@ -195,9 +194,9 @@ class AuthController extends Controller
             }
 
             $updatedUser = $this->authService->updateProfile($user, $validator->validated());
-            
+
             return $this->successResponse([
-                'user' => new UserResource($updatedUser->load('company')),
+                'user' => new UserResource($updatedUser),
             ], 'Perfil actualizado correctamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al actualizar perfil: ' . $e->getMessage(), 500);

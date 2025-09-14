@@ -28,7 +28,6 @@ export class RegisterComponent {
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(8)]],
       password_confirmation: ['', [Validators.required]],
-      company_id: [null],
       role: ['usuario_final', [Validators.required]]
     }, { validators: this.passwordMatchValidator });
   }
@@ -60,7 +59,6 @@ export class RegisterComponent {
         email: this.registerForm.value.email,
         password: this.registerForm.value.password,
         password_confirmation: this.registerForm.value.password_confirmation,
-        company_id: this.registerForm.value.company_id || null,
         role: this.registerForm.value.role
       };
 

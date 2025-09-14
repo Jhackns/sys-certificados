@@ -1,0 +1,91 @@
+<div class="permissions-container">
+  <div class="page-header">
+    <h1>Gestión de Permisos</h1>
+    <p>Administra los permisos disponibles en el sistema</p>
+  </div>
+
+  <div class="content-card">
+    <!-- Loading State -->
+    <div *ngIf="isLoading()" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Cargando permisos...</p>
+    </div>
+
+    <!-- Error State -->
+    <div *ngIf="errorMessage() && !isLoading()" class="error-state">
+      <div class="error-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <h3>Error al cargar los permisos</h3>
+      <p>{{ errorMessage() }}</p>
+      <button class="btn btn-primary" (click)="loadPermissions()">Reintentar</button>
+    </div>
+
+    <!-- Permissions Content -->
+    <div *ngIf="!isLoading() && !errorMessage()" class="permissions-content">
+      <!-- Search Bar -->
+      <div class="search-bar">
+        <div class="search-input-container">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input 
+            type="text" 
+            [(ngModel)]="searchQuery" 
+            (input)="searchQuery.set($any($event.target).value)"
+            placeholder="Buscar permisos..."
+            class="search-input"
+          >
+        </div>
+        <div class="permissions-count">
+          <span class="count-number">{{ permissions().length }}</span>
+          <span class="count-label">permisos en total</span>
+        </div>
+      </div>
+
+      <!-- Permissions List -->
+      <div class="permissions-list">
+        <div *ngFor="let group of getFilteredPermissions() | keyvalue" class="permission-group">
+          <h3 class="group-title">{{ group.key | titlecase }}</h3>
+          <div class="permission-grid">
+            <div *ngFor="let permission of group.value" class="permission-item">
+              <div class="permission-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <div class="permission-details">
+                <div class="permission-name">{{ formatPermissionName(permission.name) }}</div>
+                <div class="permission-id">ID: {{ permission.id }}</div>
+              </div>
+              <div class="permission-guard">
+                <span class="badge">{{ permission.guard_name }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty Search State -->
+        <div *ngIf="hasNoFilteredPermissions()" class="empty-search">
+          <div class="empty-icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <line x1="15" y1="15" x2="14.35" y2="14.35"/>
+              <line x1="3" y1="3" x2="21" y2="21" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <h3>No se encontraron permisos</h3>
+          <p>No hay permisos que coincidan con tu búsqueda</p>
+          <button class="btn btn-outline" (click)="searchQuery.set('')">Limpiar búsqueda</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

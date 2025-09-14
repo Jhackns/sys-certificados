@@ -2,7 +2,6 @@ export interface User {
   id: number;
   name: string;
   email: string;
-  company_id?: number;
   created_at: string;
   updated_at: string;
 }
@@ -16,8 +15,7 @@ export interface RegisterRequest {
   name: string;
   email: string;
   password: string;
-  password_confirmation: string;
-  company_id?: number | null;
+  password_confirmation?: string;
   role: string;
 }
 
@@ -30,7 +28,6 @@ export interface LoginResponse {
     token_type: string;
     roles: string[];
     permissions: string[];
-    company: any;
     email_verified: boolean;
   };
 }

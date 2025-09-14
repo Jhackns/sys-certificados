@@ -163,23 +163,12 @@ class DatabaseSeeder extends Seeder
     {
         $this->command->info('× Creando usuarios de prueba...');
 
-        // Crear empresa principal para los usuarios del sistema
-        $company = Company::create([
-            'name' => 'Certificaciones Digitales S.A.C.',
-            'ruc' => '20123456789',
-            'address' => 'Av. Tecnología 123, Lima, Perú',
-            'phone' => '+51 1 234-5678',
-            'email' => 'contacto@certificaciones.com',
-            'is_active' => true,
-        ]);
-
         // Super Admin
         $superAdmin = User::create([
             'name' => 'Super Administrador',
             'email' => 'superadmin@certificados.com',
             'password' => Hash::make('SuperAdmin123!'),
             'email_verified_at' => now(),
-            'company_id' => null,
         ]);
         $superAdmin->assignRole('super_admin');
 
@@ -189,7 +178,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@certificaciones.com',
             'password' => Hash::make('Admin123!'),
             'email_verified_at' => now(),
-            'company_id' => $company->id,
         ]);
         $admin->assignRole('administrador');
 
@@ -199,7 +187,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'emisor@certificaciones.com',
             'password' => Hash::make('Emisor123!'),
             'email_verified_at' => now(),
-            'company_id' => $company->id,
         ]);
         $emisor->assignRole('emisor');
 
@@ -209,7 +196,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'validador@certificaciones.com',
             'password' => Hash::make('Validador123!'),
             'email_verified_at' => now(),
-            'company_id' => $company->id,
         ]);
         $validador->assignRole('validador');
 
@@ -219,7 +205,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'estudiante@ejemplo.com',
             'password' => Hash::make('Usuario123!'),
             'email_verified_at' => now(),
-            'company_id' => null,
         ]);
         $usuarioFinal->assignRole('usuario_final');
 
@@ -236,26 +221,13 @@ class DatabaseSeeder extends Seeder
     {
         $this->command->info('× Creando datos maestros del sistema...');
 
-        // Crear empresas adicionales
-        $companies = Company::factory(3)->create();
-        
-        // Crear usuarios para cada empresa
-        foreach ($companies as $company) {
-            User::factory(2)->forCompany($company)->create();
-        }
+        // Elimina la creación de empresas adicionales
+        // $companies = Company::factory(3)->create();
 
-        // Crear actividades base para cada empresa
-        $allCompanies = Company::all();
-        foreach ($allCompanies as $company) {
-            Activity::factory(2)->forCompany($company)->course()->create();
-            Activity::factory(1)->forCompany($company)->event()->create();
-        }
-
-        // Crear plantillas base
-        foreach ($allCompanies as $company) {
-            CertificateTemplate::factory(1)->forCompany($company)->forCourses()->create();
-            CertificateTemplate::factory(1)->forCompany($company)->forEvents()->create();
-        }
+        // Elimina la creación de actividades y plantillas por empresa
+        // Crea actividades y plantillas globales
+        Activity::factory(6)->create();
+        CertificateTemplate::factory(2)->create();
 
         $this->command->info('  × Datos maestros creados correctamente');
     }
@@ -274,9 +246,9 @@ class DatabaseSeeder extends Seeder
         $finalUsers = User::whereNull('company_id')->get();
         $signers = User::whereNotNull('company_id')->get();
 
-        // Crear usuarios finales adicionales
-        User::factory(15)->withoutCompany()->create();
-        $finalUsers = User::whereNull('company_id')->get();
+        // Eliminar la creación de usuarios finales adicionales
+        // User::factory(15)->withoutCompany()->create();
+        // $finalUsers = User::whereNull('company_id')->get();
 
         foreach ($activities as $activity) {
             $certificateCount = rand(8, 20);
