@@ -2,6 +2,8 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  roles?: string[];        // agregado: roles opcionales
+  permissions?: string[];  // agregado: permissions opcionales
   created_at: string;
   updated_at: string;
 }
@@ -16,7 +18,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   password_confirmation?: string;
-  role: string;
+  role?: string;
 }
 
 export interface LoginResponse {

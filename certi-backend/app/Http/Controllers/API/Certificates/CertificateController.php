@@ -37,8 +37,8 @@ class CertificateController extends Controller
             $perPage = $request->query('per_page', 15);
 
             // Si hay criterios de búsqueda, usar el método search
-            if ($request->hasAny(['search', 'activity_id', 'company_id', 'status', 'issue_date_from', 'issue_date_to'])) {
-                $criteria = $request->only(['search', 'activity_id', 'company_id', 'status', 'issue_date_from', 'issue_date_to']);
+            if ($request->hasAny(['search', 'activity_id', 'template_id', 'user_id', 'status', 'fecha_emision', 'fecha_vencimiento'])) {
+                $criteria = $request->only(['search', 'activity_id', 'template_id', 'user_id', 'status', 'fecha_emision', 'fecha_vencimiento']);
                 $certificates = $this->certificateService->search($criteria, $perPage);
             } else {
                 $certificates = $this->certificateService->getAll($perPage);
@@ -88,7 +88,7 @@ class CertificateController extends Controller
             }
 
             return $this->successResponse([
-                'certificate' => new CertificateResource($certificate->load(['activity.company']))
+                'certificate' => new CertificateResource($certificate->load(['user', 'activity', 'template', 'signer']))
             ], 'Certificado creado exitosamente', Response::HTTP_CREATED);
         } catch (\Exception $e) {
             Log::error('Error al crear certificado: ' . $e->getMessage());
@@ -148,7 +148,7 @@ class CertificateController extends Controller
             $updatedCertificate = $this->certificateService->update($certificate, $data);
 
             return $this->successResponse([
-                'certificate' => new CertificateResource($updatedCertificate->load(['activity.company']))
+                'certificate' => new CertificateResource($updatedCertificate->load(['user', 'activity', 'template', 'signer']))
             ], 'Certificado actualizado exitosamente');
         } catch (\Exception $e) {
             Log::error('Error al actualizar certificado: ' . $e->getMessage());
@@ -206,7 +206,7 @@ class CertificateController extends Controller
             $updatedCertificate = $this->certificateService->changeStatus($certificate, $status);
 
             return $this->successResponse([
-                'certificate' => new CertificateResource($updatedCertificate->load(['activity.company']))
+                'certificate' => new CertificateResource($updatedCertificate->load(['user', 'activity', 'template', 'signer']))
             ], 'Estado del certificado actualizado exitosamente');
         } catch (\Exception $e) {
             Log::error('Error al cambiar estado del certificado: ' . $e->getMessage());

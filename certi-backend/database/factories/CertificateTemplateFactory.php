@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Company;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,8 +19,7 @@ class CertificateTemplateFactory extends Factory
         $activityType = $this->faker->randomElement(['course', 'event', 'other']);
         
         return [
-            'company_id' => Company::factory(),
-            'name' => $this->generateTemplateName($activityType),
+'name' => $this->generateTemplateName($activityType),
             'description' => $this->faker->sentence(10),
             'file_path' => 'templates/' . $this->faker->uuid() . '.html',
             'activity_type' => $activityType,

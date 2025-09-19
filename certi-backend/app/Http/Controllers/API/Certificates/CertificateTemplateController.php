@@ -25,6 +25,60 @@ class CertificateTemplateController extends Controller
     }
 
     /**
+     * Obtener lista simple de plantillas para dropdowns
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function list(Request $request): JsonResponse
+    {
+        try {
+            $templates = CertificateTemplate::select('id', 'name', 'description')
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+
+            return $this->successResponse([
+                'templates' => $templates
+            ], 'Lista de plantillas obtenida correctamente');
+        } catch (\Exception $e) {
+            Log::error('Error en CertificateTemplateController@list: ' . $e->getMessage());
+            return $this->errorResponse('Error al obtener lista de plantillas: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Obtener vista previa de una plantilla
+     *
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function preview(int $id): JsonResponse
+    {
+        try {
+            $template = CertificateTemplate::with(['company'])->findOrFail($id);
+
+            return $this->successResponse([
+                'template' => [
+                    'id' => $template->id,
+                    'name' => $template->name,
+                    'description' => $template->description,
+                    'html_content' => $template->html_content,
+                    'css_styles' => $template->css_styles,
+                    'company' => $template->company ? [
+                        'id' => $template->company->id,
+                        'name' => $template->company->name,
+                        'logo_url' => $template->company->logo_url,
+                    ] : null,
+                ]
+            ], 'Vista previa de plantilla obtenida correctamente');
+        } catch (\Exception $e) {
+            Log::error('Error en CertificateTemplateController@preview: ' . $e->getMessage());
+            return $this->errorResponse('Error al obtener vista previa de plantilla: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Mostrar todas las plantillas
      *
      * @param Request $request
@@ -34,7 +88,7 @@ class CertificateTemplateController extends Controller
     {
         try {
             $perPage = $request->query('per_page', 15);
-            
+
             // Si hay criterios de búsqueda, usar el método search
             if ($request->hasAny(['search', 'company_id', 'is_active'])) {
                 $criteria = $request->only(['search', 'company_id', 'is_active']);
@@ -44,7 +98,7 @@ class CertificateTemplateController extends Controller
             }
 
             return $this->successResponse([
-                'templates' => $templates->items()->map(function ($template) {
+                'templates' => collect($templates->items())->map(function ($template) {
                     return [
                         'id' => $template->id,
                         'name' => $template->name,
@@ -60,7 +114,7 @@ class CertificateTemplateController extends Controller
                         'created_at' => $template->created_at,
                         'updated_at' => $template->updated_at,
                     ];
-                }),
+                })->toArray(),
                 'pagination' => [
                     'current_page' => $templates->currentPage(),
                     'last_page' => $templates->lastPage(),
@@ -84,10 +138,10 @@ class CertificateTemplateController extends Controller
     {
         try {
             $data = $request->validated();
-            
+
             // Crear la plantilla
             $template = $this->templateService->create($data);
-            
+
             // Log de la creación
             if (Auth::check()) {
                 $user = Auth::user();
@@ -96,7 +150,7 @@ class CertificateTemplateController extends Controller
                     'user_id' => $user->id
                 ]);
             }
-            
+
             return $this->successResponse([
                 'template' => [
                     'id' => $template->id,
@@ -112,7 +166,7 @@ class CertificateTemplateController extends Controller
             ], 'Plantilla creada exitosamente', Response::HTTP_CREATED);
         } catch (\Exception $e) {
             Log::error('Error al crear plantilla: ' . $e->getMessage());
-            
+
             return $this->errorResponse(
                 'Error al procesar la solicitud: ' . $e->getMessage(),
                 Response::HTTP_INTERNAL_SERVER_ERROR
@@ -131,7 +185,7 @@ class CertificateTemplateController extends Controller
         try {
             $id = (int) $id;
             $template = $this->templateService->getById($id);
-        
+
             if (!$template) {
                 return $this->notFoundResponse('Plantilla no encontrada');
             }
@@ -281,11 +335,11 @@ class CertificateTemplateController extends Controller
         try {
             $companyId = (int) $companyId;
             $perPage = $request->query('per_page', 15);
-            
+
             $templates = $this->templateService->getByCompany($companyId, $perPage);
 
             return $this->successResponse([
-                'templates' => $templates->items()->map(function ($template) {
+                'templates' => collect($templates->items())->map(function ($template) {
                     return [
                         'id' => $template->id,
                         'name' => $template->name,
@@ -295,7 +349,7 @@ class CertificateTemplateController extends Controller
                         'created_at' => $template->created_at,
                         'updated_at' => $template->updated_at,
                     ];
-                }),
+                })->toArray(),
                 'pagination' => [
                     'current_page' => $templates->currentPage(),
                     'last_page' => $templates->lastPage(),

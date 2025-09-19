@@ -26,6 +26,29 @@ class ActivityController extends Controller
     }
 
     /**
+     * Obtener lista simple de actividades para dropdowns
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function list(Request $request): JsonResponse
+    {
+        try {
+            $activities = Activity::select('id', 'name', 'description', 'type')
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+
+            return $this->successResponse([
+                'activities' => $activities
+            ], 'Lista de actividades obtenida correctamente');
+        } catch (\Exception $e) {
+            Log::error('Error en ActivityController@list: ' . $e->getMessage());
+            return $this->errorResponse('Error al obtener lista de actividades: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Mostrar todas las actividades
      *
      * @param Request $request
@@ -37,8 +60,8 @@ class ActivityController extends Controller
             $perPage = $request->query('per_page', 15);
 
             // Si hay criterios de búsqueda, usar el método search
-            if ($request->hasAny(['search', 'company_id', 'is_active'])) {
-                $criteria = $request->only(['search', 'company_id', 'is_active']);
+            if ($request->hasAny(['search', 'is_active'])) {
+                $criteria = $request->only(['search', 'is_active']);
                 $activities = $this->activityService->search($criteria, $perPage);
             } else {
                 $activities = $this->activityService->getAll($perPage);
@@ -205,35 +228,7 @@ class ActivityController extends Controller
         }
     }
 
-    /**
-     * Obtener actividades por empresa
-     *
-     * @param Request $request
-     * @param int $companyId
-     * @return JsonResponse
-     */
-    public function byCompany(Request $request, $companyId): JsonResponse
-    {
-        try {
-            $companyId = (int) $companyId;
-            $perPage = $request->query('per_page', 15);
 
-            $activities = $this->activityService->getByCompany($companyId, $perPage);
-
-            return $this->successResponse([
-                'activities' => ActivityResource::collection($activities->items()),
-                'pagination' => [
-                    'current_page' => $activities->currentPage(),
-                    'last_page' => $activities->lastPage(),
-                    'per_page' => $activities->perPage(),
-                    'total' => $activities->total(),
-                ]
-            ], 'Actividades de la empresa obtenidas correctamente');
-        } catch (\Exception $e) {
-            Log::error('Error al obtener actividades por empresa: ' . $e->getMessage());
-            return $this->errorResponse('Error al obtener actividades: ' . $e->getMessage(), 500);
-        }
-    }
 
     /**
      * Obtener certificados de una actividad
@@ -256,7 +251,7 @@ class ActivityController extends Controller
             $certificates = $this->activityService->getCertificates($activity, $perPage);
 
             return $this->successResponse([
-                'certificates' => $certificates->items()->map(function ($certificate) {
+                'certificates' => collect($certificates->items())->map(function ($certificate) {
                     return [
                         'id' => $certificate->id,
                         'unique_code' => $certificate->unique_code,
@@ -264,7 +259,7 @@ class ActivityController extends Controller
                         'issued_at' => $certificate->issued_at,
                         'created_at' => $certificate->created_at,
                     ];
-                }),
+                })->toArray(),
                 'pagination' => [
                     'current_page' => $certificates->currentPage(),
                     'last_page' => $certificates->lastPage(),

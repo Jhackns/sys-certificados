@@ -25,7 +25,12 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'company_id',
+        'fecha_nacimiento',
+        'pais',
+        'genero',
+        'telefono',
+        'activo',
+        'last_login',
     ];
 
     /**
@@ -48,15 +53,10 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'fecha_nacimiento' => 'date',
+            'activo' => 'boolean',
+            'last_login' => 'datetime',
         ];
-    }
-
-    /**
-     * Relación con empresa
-     */
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
     }
 
     /**
@@ -89,21 +89,5 @@ class User extends Authenticatable
     public function emailSends(): HasMany
     {
         return $this->hasMany(EmailSend::class);
-    }
-
-    /**
-     * Scope para usuarios de una empresa específica
-     */
-    public function scopeFromCompany($query, $companyId)
-    {
-        return $query->where('company_id', $companyId);
-    }
-
-    /**
-     * Scope para usuarios sin empresa (usuarios finales)
-     */
-    public function scopeWithoutCompany($query)
-    {
-        return $query->whereNull('company_id');
     }
 }

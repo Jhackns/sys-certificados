@@ -16,61 +16,97 @@
       <div class="info-item">
         <strong>Email:</strong> {{ currentUser()?.email }}
       </div>
-      <div class="info-item" *ngIf="currentUser()?.company_id">
-        <strong>Empresa ID:</strong> {{ currentUser()?.company_id }}
+    </div>
+  </div>
+
+  <!-- Dashboard Statistics -->
+  <div class="stats-section">
+    <h3>Resumen de Estadísticas</h3>
+
+    <!-- Stats Cards -->
+    <div class="stats-row">
+      <!-- Primera fila -->
+      <div class="stats-row-group">
+        <!-- Total Usuarios -->
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-users"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ users().length }}</div>
+            <div class="stat-label">Total de Usuarios</div>
+          </div>
+        </div>
+
+        <!-- Total Certificados -->
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-certificate"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ certificates().length }}</div>
+            <div class="stat-label">Total de Certificados</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Segunda fila -->
+      <div class="stats-row-group">
+        <!-- Certificados Activos -->
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ activeCertificates().length }}</div>
+            <div class="stat-label">Certificados Activos</div>
+          </div>
+        </div>
+
+        <!-- Este Mes -->
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-calendar-alt"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ thisMonthCertificates().length }}</div>
+            <div class="stat-label">Este Mes</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="quick-actions">
-    <h3>Acciones Rápidas</h3>
-    <div class="actions-grid">
-      <div class="action-card">
-        <div class="action-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14,2 14,8 20,8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10,9 9,9 8,9"/>
-          </svg>
-        </div>
-        <h4>Certificados</h4>
-        <p>Gestiona tus certificados</p>
+  <!-- Recent Certificates Section -->
+  <div class="recent-certificates-section">
+    <h3>Certificados Recientes</h3>
+    <div class="certificates-container">
+      <div *ngIf="isLoading()" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Cargando certificados...</p>
       </div>
 
-      <div class="action-card">
-        <div class="action-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-          </svg>
-        </div>
-        <h4>Plantillas</h4>
-        <p>Administra plantillas</p>
+      <div *ngIf="!isLoading() && recentCertificates().length === 0" class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14,2 14,8 20,8"/>
+        </svg>
+        <p>No hay certificados recientes</p>
       </div>
 
-      <div class="action-card">
-        <div class="action-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
+      <div *ngIf="!isLoading() && recentCertificates().length > 0" class="certificates-list">
+        <div *ngFor="let certificate of recentCertificates()" class="certificate-item">
+          <div class="certificate-info">
+            <h4>{{ certificate.activity_name }}</h4>
+            <p class="issued-to">Emitido para: {{ certificate.user_name }}</p>
+            <p class="issue-date">{{ formatDate(certificate.fecha_emision) }}</p>
+          </div>
+          <div class="certificate-status">
+            <span class="status-badge" [class]="'status-' + certificate.status">
+              {{ certificate.status }}
+            </span>
+          </div>
         </div>
-        <h4>Usuarios</h4>
-        <p>Gestiona usuarios</p>
-      </div>
-
-      <div class="action-card">
-        <div class="action-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 3h18v18H3zM9 9h6v6H9z"/>
-          </svg>
-        </div>
-        <h4>Reportes</h4>
-        <p>Ver estadísticas</p>
       </div>
     </div>
   </div>

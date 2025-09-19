@@ -24,7 +24,7 @@ export class SidebarComponent {
   }
 
   logout(): void {
-    this.authService.logout();
+    this.authService.logoutAndRedirect();
   }
 
   navigateTo(route: string): void {

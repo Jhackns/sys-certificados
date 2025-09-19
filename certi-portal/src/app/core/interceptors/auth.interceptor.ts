@@ -36,8 +36,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       // Manejar errores de autenticación
       if (error.status === 401) {
         // Token expirado o inválido
-        authService.logout();
-        router.navigate(['/login']);
+        authService.logoutAndRedirect();
       }
 
       return throwError(() => error);

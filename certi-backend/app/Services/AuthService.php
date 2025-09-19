@@ -23,11 +23,10 @@ class AuthService
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
-                'company_id' => $data['company_id'] ?? null,
             ]);
 
             // Asignar rol por defecto
-            $defaultRole = isset($data['company_id']) ? 'emisor' : 'usuario_final';
+            $defaultRole = isset($data) ? 'emisor' : 'usuario_final';
             $user->assignRole($data['role'] ?? $defaultRole);
 
             return $user;
@@ -43,24 +42,22 @@ class AuthService
      */
     public function login(string $email, string $password)
     {
-        if (!Auth::attempt(['email' => $email, 'password' => $password])) {
-            return false;
+        $user = \App\Models\User::where('email', $email)->first();
+
+        if (!$user || !\Hash::check($password, $user->password)) {
+            return null;
         }
 
-        $user = Auth::user();
-
-        // Verificar si el usuario está activo (si tienes este campo)
-        // if (!$user->is_active) {
-        //     return ['error' => 'inactive_user'];
-        // }
+        if (isset($user->is_active) && !$user->is_active) {
+            return ['error' => 'inactive_user'];
+        }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return [
-            'user' => $user->load('company'),
+            'user' => $user,
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
-            'company' => $user->company,
             'access_token' => $token,
             'token_type' => 'Bearer',
             'email_verified' => $user->hasVerifiedEmail(),

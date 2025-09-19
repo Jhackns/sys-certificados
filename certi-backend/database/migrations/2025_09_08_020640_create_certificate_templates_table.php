@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::create('certificate_templates', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('company_id')->constrained('companies')->onDelete('cascade');
             $table->string('name');
             $table->text('description')->nullable();
             $table->string('file_path')->nullable();

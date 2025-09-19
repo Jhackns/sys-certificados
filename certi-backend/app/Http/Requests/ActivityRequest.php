@@ -22,10 +22,10 @@ class ActivityRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'type' => 'nullable|in:course,event,other',
+            'duration_hours' => 'nullable|integer',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'is_active' => 'sometimes|boolean',

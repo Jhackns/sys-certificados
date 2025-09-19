@@ -18,7 +18,7 @@ class CertificateService
      */
     public function getAll(int $perPage = 15)
     {
-        return Certificate::with(['activity.company', 'documents', 'validations'])
+        return Certificate::with(['user', 'activity', 'template', 'signer', 'documents', 'validations'])
             ->withCount(['documents', 'validations'])
             ->paginate($perPage);
     }
@@ -31,7 +31,7 @@ class CertificateService
      */
     public function getById(int $id): ?Certificate
     {
-        return Certificate::with(['activity.company', 'documents', 'validations'])
+        return Certificate::with(['user', 'activity', 'template', 'signer', 'documents', 'validations'])
             ->withCount(['documents', 'validations'])
             ->find($id);
     }
@@ -47,6 +47,16 @@ class CertificateService
         return DB::transaction(function () use ($data) {
             // Generar código único del certificado
             $data['unique_code'] = $this->generateCertificateCode();
+
+            // Establecer fecha de emisión si no se proporciona
+            if (!isset($data['fecha_emision'])) {
+                $data['fecha_emision'] = now()->format('Y-m-d');
+            }
+
+            // Establecer issued_at si no se proporciona
+            if (!isset($data['issued_at'])) {
+                $data['issued_at'] = now();
+            }
 
             $certificate = Certificate::create($data);
 
@@ -110,15 +120,19 @@ class CertificateService
      */
     public function search(array $criteria, int $perPage = 15)
     {
-        $query = Certificate::with(['activity.company', 'documents', 'validations'])
+        $query = Certificate::with(['user', 'activity', 'template', 'signer', 'documents', 'validations'])
             ->withCount(['documents', 'validations']);
 
         if (isset($criteria['search'])) {
             $search = $criteria['search'];
             $query->where(function ($q) use ($search) {
-                $q->where('participant_name', 'like', "%{$search}%")
-                  ->orWhere('participant_email', 'like', "%{$search}%")
-                  ->orWhere('certificate_code', 'like', "%{$search}%");
+                $q->where('nombre', 'like', "%{$search}%")
+                  ->orWhere('descripcion', 'like', "%{$search}%")
+                  ->orWhere('unique_code', 'like', "%{$search}%")
+                  ->orWhereHas('user', function ($userQuery) use ($search) {
+                      $userQuery->where('name', 'like', "%{$search}%")
+                               ->orWhere('email', 'like', "%{$search}%");
+                  });
             });
         }
 
@@ -126,14 +140,32 @@ class CertificateService
             $query->where('activity_id', $criteria['activity_id']);
         }
 
-        if (isset($criteria['company_id'])) {
-            $query->whereHas('activity', function ($q) use ($criteria) {
-                $q->where('company_id', $criteria['company_id']);
-            });
+        if (isset($criteria['template_id'])) {
+            $query->where('id_template', $criteria['template_id']);
+        }
+
+        if (isset($criteria['user_id'])) {
+            $query->where('user_id', $criteria['user_id']);
         }
 
         if (isset($criteria['status'])) {
             $query->where('status', $criteria['status']);
+        }
+
+        if (isset($criteria['fecha_emision_from'])) {
+            $query->where('fecha_emision', '>=', $criteria['fecha_emision_from']);
+        }
+
+        if (isset($criteria['fecha_emision_to'])) {
+            $query->where('fecha_emision', '<=', $criteria['fecha_emision_to']);
+        }
+
+        if (isset($criteria['fecha_vencimiento_from'])) {
+            $query->where('fecha_vencimiento', '>=', $criteria['fecha_vencimiento_from']);
+        }
+
+        if (isset($criteria['fecha_vencimiento_to'])) {
+            $query->where('fecha_vencimiento', '<=', $criteria['fecha_vencimiento_to']);
         }
 
         if (isset($criteria['issue_date_from'])) {
@@ -218,7 +250,7 @@ class CertificateService
      */
     public function getByCode(string $code): ?Certificate
     {
-        return Certificate::with(['activity.company', 'documents', 'validations'])
+        return Certificate::with(['activity', 'documents', 'validations'])
             ->where('unique_code', $code)
             ->first();
     }
@@ -246,12 +278,6 @@ class CertificateService
     public function getStatistics(array $filters = []): array
     {
         $query = Certificate::query();
-
-        if (isset($filters['company_id'])) {
-            $query->whereHas('activity', function ($q) use ($filters) {
-                $q->where('company_id', $filters['company_id']);
-            });
-        }
 
         if (isset($filters['activity_id'])) {
             $query->where('activity_id', $filters['activity_id']);

@@ -22,14 +22,15 @@ class CertificateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'participant_name' => 'required|string|max:255',
-            'participant_email' => 'required|email|max:255',
-            'participant_document' => 'nullable|string|max:50',
-            'issue_date' => 'required|date',
-            'expiry_date' => 'nullable|date|after:issue_date',
+            'user_id' => 'required|exists:users,id',
             'activity_id' => 'required|exists:activities,id',
-            'template_id' => 'nullable|exists:certificate_templates,id',
-            'status' => 'sometimes|in:draft,issued,revoked',
+            'id_template' => 'required|exists:certificate_templates,id',
+            'nombre' => 'required|string|max:255',
+            'descripcion' => 'nullable|string|max:1000',
+            'fecha_emision' => 'required|date',
+            'fecha_vencimiento' => 'nullable|date|after:fecha_emision',
+            'signed_by' => 'nullable|exists:users,id',
+            'status' => 'sometimes|in:active,revoked,expired',
         ];
     }
 
@@ -41,20 +42,21 @@ class CertificateRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'participant_name.required' => 'El nombre del participante es obligatorio.',
-            'participant_name.max' => 'El nombre del participante no puede exceder 255 caracteres.',
-            'participant_email.required' => 'El email del participante es obligatorio.',
-            'participant_email.email' => 'El email debe tener un formato válido.',
-            'participant_email.max' => 'El email no puede exceder 255 caracteres.',
-            'participant_document.max' => 'El documento no puede exceder 50 caracteres.',
-            'issue_date.required' => 'La fecha de emisión es obligatoria.',
-            'issue_date.date' => 'La fecha de emisión debe ser una fecha válida.',
-            'expiry_date.date' => 'La fecha de vencimiento debe ser una fecha válida.',
-            'expiry_date.after' => 'La fecha de vencimiento debe ser posterior a la fecha de emisión.',
+            'user_id.required' => 'El usuario es obligatorio.',
+            'user_id.exists' => 'El usuario seleccionado no existe.',
             'activity_id.required' => 'La actividad es obligatoria.',
             'activity_id.exists' => 'La actividad seleccionada no existe.',
-            'template_id.exists' => 'La plantilla seleccionada no existe.',
-            'status.in' => 'El estado debe ser: draft, issued o revoked.',
+            'id_template.required' => 'La plantilla es obligatoria.',
+            'id_template.exists' => 'La plantilla seleccionada no existe.',
+            'nombre.required' => 'El nombre del certificado es obligatorio.',
+            'nombre.max' => 'El nombre del certificado no puede exceder 255 caracteres.',
+            'descripcion.max' => 'La descripción no puede exceder 1000 caracteres.',
+            'fecha_emision.required' => 'La fecha de emisión es obligatoria.',
+            'fecha_emision.date' => 'La fecha de emisión debe ser una fecha válida.',
+            'fecha_vencimiento.date' => 'La fecha de vencimiento debe ser una fecha válida.',
+            'fecha_vencimiento.after' => 'La fecha de vencimiento debe ser posterior a la fecha de emisión.',
+            'signed_by.exists' => 'El firmante seleccionado no existe.',
+            'status.in' => 'El estado debe ser: active, revoked o expired.',
         ];
     }
 }

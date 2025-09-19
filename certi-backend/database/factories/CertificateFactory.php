@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\Activity;
-use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -23,8 +22,7 @@ class CertificateFactory extends Factory
         $issuedAt = $this->faker->dateTimeBetween('-1 year', 'now');
         
         return [
-            'company_id' => Company::factory(),
-            'user_id' => User::factory(),
+'user_id' => User::factory(),
             'activity_id' => Activity::factory(),
             'signed_by' => User::factory(),
             'unique_code' => $this->generateUniqueCode(),
@@ -103,16 +101,6 @@ class CertificateFactory extends Factory
     }
 
     /**
-     * Create certificate for specific company.
-     */
-    public function forCompany(Company $company): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'company_id' => $company->id,
-        ]);
-    }
-
-    /**
      * Create certificate for specific user.
      */
     public function forUser(User $user): static
@@ -129,7 +117,6 @@ class CertificateFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'activity_id' => $activity->id,
-            'company_id' => $activity->company_id,
         ]);
     }
 

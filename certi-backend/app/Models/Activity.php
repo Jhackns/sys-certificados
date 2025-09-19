@@ -12,26 +12,21 @@ class Activity extends Model
     use HasFactory;
 
     protected $fillable = [
-        'company_id',
         'name',
         'description',
         'type',
+        'duration_hours',
         'start_date',
         'end_date',
+        'is_active',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'is_active' => 'boolean',
+        'duration_hours' => 'integer',
     ];
-
-    /**
-     * Relación con empresa
-     */
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
-    }
 
     /**
      * Relación con certificados

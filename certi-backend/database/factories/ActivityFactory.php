@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Company;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -22,8 +21,7 @@ class ActivityFactory extends Factory
         $endDate = $this->faker->dateTimeBetween($startDate, '+6 months');
 
         return [
-            'company_id' => Company::factory(),
-            'name' => $this->generateActivityName($type),
+'name' => $this->generateActivityName($type),
             'description' => $this->faker->paragraph(3),
             'type' => $type,
             'start_date' => $startDate,

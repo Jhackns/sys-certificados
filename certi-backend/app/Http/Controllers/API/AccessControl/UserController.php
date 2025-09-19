@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -30,16 +31,13 @@ class UserController extends Controller
         }
 
         try {
-            $query = User::with(['company', 'roles']);
+            // incluir roles explícitamente
+            $query = User::with(['roles', 'permissions']);
 
             // Filtros
-            if ($request->has('company_id')) {
-                $query->where('company_id', $request->company_id);
-            }
-
-            // Comentamos temporalmente el filtro de rol que puede estar causando problemas
-            // if ($request->has('role')) {
-            //     $query->role($request->role);
+            // Elimina filtro por company_id
+            // if ($request->has('company_id')) {
+            //     $query->where('company_id', $request->company_id);
             // }
 
             if ($request->has('search')) {
@@ -55,6 +53,7 @@ class UserController extends Controller
             $users = $query->paginate($perPage);
 
             return $this->successResponse([
+                // pasar modelos cargados al recurso para que 'roles' aparezca
                 'users' => UserResource::collection($users->items()),
                 'pagination' => [
                     'current_page' => $users->currentPage(),
@@ -64,9 +63,32 @@ class UserController extends Controller
                 ]
             ], 'Usuarios obtenidos correctamente');
         } catch (\Exception $e) {
-            \Log::error('Error en UserController@index: ' . $e->getMessage());
-            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error('Error en UserController@index: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
             return $this->errorResponse('Error al obtener usuarios: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Obtener lista simple de usuarios para dropdowns
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function list(Request $request): JsonResponse
+    {
+        try {
+            $users = User::select('id', 'name', 'email')
+                ->where('activo', true)
+                ->orderBy('name')
+                ->get();
+
+            return $this->successResponse([
+                'users' => $users
+            ], 'Lista de usuarios obtenida correctamente');
+        } catch (\Exception $e) {
+            Log::error('Error en UserController@list: ' . $e->getMessage());
+            return $this->errorResponse('Error al obtener lista de usuarios: ' . $e->getMessage(), 500);
         }
     }
 
@@ -79,7 +101,7 @@ class UserController extends Controller
     public function show(int $id): JsonResponse
     {
         try {
-            $user = User::with(['company', 'roles', 'permissions'])->findOrFail($id);
+            $user = User::with(['roles', 'permissions'])->findOrFail($id); // Elimina 'company'
 
             return $this->successResponse([
                 'user' => new UserResource($user)
@@ -106,7 +128,11 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'company_id' => 'nullable|exists:companies,id',
+            'fecha_nacimiento' => 'nullable|date',
+            'pais' => 'nullable|string|max:100',
+            'genero' => 'nullable|string|max:20',
+            'telefono' => 'nullable|string|max:20',
+            'activo' => 'nullable|boolean',
             'roles' => 'required|array',
             'roles.*' => 'exists:roles,name',
         ]);
@@ -120,14 +146,19 @@ class UserController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'company_id' => $request->company_id,
+                'fecha_nacimiento' => $request->fecha_nacimiento,
+                'pais' => $request->pais,
+                'genero' => $request->genero,
+                'telefono' => $request->telefono,
+                'activo' => $request->has('activo') ? $request->activo : true,
+                'last_login' => null,
             ]);
 
             // Asignar roles
             $user->assignRole($request->roles);
 
             return $this->successResponse([
-                'user' => new UserResource($user->load(['company', 'roles']))
+                'user' => new UserResource($user->load(['roles'])) // Elimina 'company'
             ], 'Usuario creado correctamente', 201);
         } catch (\Exception $e) {
             return $this->errorResponse('Error al crear usuario: ' . $e->getMessage(), 500);
@@ -155,7 +186,11 @@ class UserController extends Controller
                 'name' => 'sometimes|required|string|max:255',
                 'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $id,
                 'password' => 'sometimes|required|string|min:8|confirmed',
-                'company_id' => 'sometimes|nullable|exists:companies,id',
+                'fecha_nacimiento' => 'sometimes|nullable|date',
+                'pais' => 'sometimes|nullable|string|max:100',
+                'genero' => 'sometimes|nullable|string|max:20',
+                'telefono' => 'sometimes|nullable|string|max:20',
+                'activo' => 'sometimes|nullable|boolean',
                 'roles' => 'sometimes|required|array',
                 'roles.*' => 'exists:roles,name',
             ]);
@@ -165,7 +200,7 @@ class UserController extends Controller
             }
 
             $data = $validator->validated();
-            
+
             if (isset($data['password'])) {
                 $data['password'] = Hash::make($data['password']);
             }
@@ -177,8 +212,11 @@ class UserController extends Controller
                 $user->syncRoles($request->roles);
             }
 
+            // Elimina 'company_id' de $data si existe
+            unset($data['company_id']);
+
             return $this->successResponse([
-                'user' => new UserResource($user->load(['company', 'roles']))
+                'user' => new UserResource($user->load(['roles'])) // Elimina 'company'
             ], 'Usuario actualizado correctamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al actualizar usuario: ' . $e->getMessage(), 500);
@@ -191,18 +229,18 @@ class UserController extends Controller
      * @param int $id
      * @return JsonResponse
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
         // Solo el super_admin puede eliminar usuarios
-        if (!auth()->user()->hasRole('super_admin')) {
+        if (!$request->user()->hasRole('super_admin')) {
             return $this->forbiddenResponse('Solo el super admin puede eliminar usuarios');
         }
 
         try {
             $user = User::findOrFail($id);
-            
+
             // Verificar que no sea el usuario autenticado
-            if (auth()->id() === $user->id) {
+            if ($request->user()->id === $user->id) {
                 return $this->errorResponse('No puedes eliminar tu propia cuenta', 400);
             }
 
@@ -242,7 +280,7 @@ class UserController extends Controller
             $user->syncRoles($request->roles);
 
             return $this->successResponse([
-                'user' => new UserResource($user->load(['company', 'roles']))
+                'user' => new UserResource($user->load(['roles'])) // Elimina 'company'
             ], 'Roles asignados correctamente');
         } catch (\Exception $e) {
             return $this->errorResponse('Error al asignar roles: ' . $e->getMessage(), 500);
@@ -252,12 +290,13 @@ class UserController extends Controller
     /**
      * Obtener roles disponibles
      *
+     * @param Request $request
      * @return JsonResponse
      */
-    public function availableRoles(): JsonResponse
+    public function availableRoles(Request $request): JsonResponse
     {
         // Solo el super_admin puede ver roles disponibles
-        if (!auth()->user()->hasRole('super_admin')) {
+        if (!$request->user()->hasRole('super_admin')) {
             return $this->forbiddenResponse('Solo el super admin puede ver roles disponibles');
         }
 
@@ -268,6 +307,7 @@ class UserController extends Controller
                 'roles' => $roles
             ], 'Roles disponibles obtenidos correctamente');
         } catch (\Exception $e) {
+            Log::error('Error en availableRoles: ' . $e->getMessage());
             return $this->errorResponse('Error al obtener roles: ' . $e->getMessage(), 500);
         }
     }

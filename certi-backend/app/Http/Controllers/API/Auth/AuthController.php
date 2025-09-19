@@ -40,7 +40,7 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'nullable|string|in:super_admin,administrador,emisor,validador,usuario_final',
+            // 'role' => 'nullable|string|in:super_admin,administrador,emisor,validador,usuario_final', // Eliminar
         ]);
 
         if ($validator->fails()) {
@@ -49,6 +49,9 @@ class AuthController extends Controller
 
         try {
             $user = $this->authService->register($validator->validated());
+
+            // Asignar rol por defecto
+            $user->assignRole('usuario_final');
 
             $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -87,11 +90,12 @@ class AuthController extends Controller
             );
 
             if (!$result) {
-                return $this->unauthorizedResponse('Credenciales inválidas');
+                // Usuario no existe o contraseña incorrecta
+                return $this->errorResponse('Correo o contraseña incorrectos', 401);
             }
 
             if (isset($result['error']) && $result['error'] === 'inactive_user') {
-                return $this->forbiddenResponse('Usuario inactivo');
+                return $this->errorResponse('Usuario inactivo', 403);
             }
 
             return $this->successResponse([
@@ -103,7 +107,8 @@ class AuthController extends Controller
                 'email_verified' => $result['email_verified'],
             ], 'Inicio de sesión exitoso');
         } catch (\Exception $e) {
-            return $this->errorResponse('Error al iniciar sesión: ' . $e->getMessage(), 500);
+            // Error inesperado en el servidor
+            return $this->errorResponse('Error inesperado en el servidor. Por favor, intente nuevamente.', 500);
         }
     }
 

@@ -16,16 +16,27 @@ class CertificateResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'user_id' => $this->user_id,
+            'activity_id' => $this->activity_id,
+            'id_template' => $this->id_template,
+            'nombre' => $this->nombre,
+            'descripcion' => $this->descripcion,
+            'fecha_emision' => $this->fecha_emision,
+            'fecha_vencimiento' => $this->fecha_vencimiento,
+            'signed_by' => $this->signed_by,
             'unique_code' => $this->unique_code,
-            'participant_name' => $this->participant_name,
-            'participant_email' => $this->participant_email,
-            'participant_document' => $this->participant_document,
+            'qr_url' => $this->qr_url,
             'issued_at' => $this->issued_at,
             'status' => $this->status,
-            'activity_id' => $this->activity_id,
-            // 'template_id' => $this->template_id, // no existe en el modelo/migración actual
             'documents_count' => $this->when(isset($this->documents_count), $this->documents_count),
             'validations_count' => $this->when(isset($this->validations_count), $this->validations_count),
+            'user' => $this->whenLoaded('user', function () {
+                return [
+                    'id' => $this->user->id,
+                    'name' => $this->user->name,
+                    'email' => $this->user->email,
+                ];
+            }),
             'activity' => $this->whenLoaded('activity', function () {
                 return [
                     'id' => $this->activity->id,
@@ -39,13 +50,20 @@ class CertificateResource extends JsonResource
                     ]),
                 ];
             }),
-            // 'template' => $this->whenLoaded('template', function () {
-            //     return [
-            //         'id' => $this->template->id,
-            //         'name' => $this->template->name,
-            //         'description' => $this->template->description,
-            //     ];
-            // }),
+            'template' => $this->whenLoaded('template', function () {
+                return [
+                    'id' => $this->template->id,
+                    'name' => $this->template->name,
+                    'description' => $this->template->description,
+                ];
+            }),
+            'signer' => $this->whenLoaded('signer', function () {
+                return [
+                    'id' => $this->signer->id,
+                    'name' => $this->signer->name,
+                    'email' => $this->signer->email,
+                ];
+            }),
             'documents' => $this->whenLoaded('documents', function () {
                 return $this->documents->map(function ($document) {
                     return [

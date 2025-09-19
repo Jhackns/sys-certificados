@@ -8,6 +8,12 @@ interface User {
   id: number;
   name: string;
   email: string;
+  fecha_nacimiento?: string | null;
+  pais?: string | null;
+  genero?: string | null;
+  telefono?: string | null;
+  activo?: boolean;
+  last_login?: string | null;
   created_at: string;
   updated_at: string;
   roles?: Role[];
@@ -38,6 +44,7 @@ interface ApiResponse {
 export class UsersComponent implements OnInit {
   users = signal<User[]>([]);
   roles = signal<Role[]>([]);
+  availableRoles = signal<Role[]>([]);
   isLoading = signal(false);
   errorMessage = signal('');
   successMessage = signal('');
@@ -50,10 +57,10 @@ export class UsersComponent implements OnInit {
 
   // Format user roles for display
   getUserRoles(user: User): string {
-    if (!user.roles || user.roles.length === 0) {
-      return 'Sin roles asignados';
-    }
-    return user.roles.map(role => role.display_name || role.name).join(', ');
+    // Si user.roles es un array, únelos por coma, si no, muestra 'Sin rol'
+    return Array.isArray(user.roles) && user.roles.length > 0
+      ? user.roles.join(', ')
+      : 'Sin rol';
   }
 
   // Forms
@@ -71,9 +78,14 @@ export class UsersComponent implements OnInit {
     this.userForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2)]],
       email: ['', [Validators.required, Validators.email]],
+      fecha_nacimiento: [''],
+      pais: [''],
+      genero: [''],
+      telefono: [''],
+      activo: [true],
       password: [''],
       password_confirmation: [''],
-      roles: [[], [Validators.required]]
+      role: ['', [Validators.required]]
     }, {
       validators: [
         this.passwordMatchValidator,
@@ -96,23 +108,18 @@ export class UsersComponent implements OnInit {
     return null;
   }
 
-  // Handle role selection changes
-  onRoleChange(event: Event, roleName: string): void {
-    const isChecked = (event.target as HTMLInputElement).checked;
-    const currentRoles = this.userForm.get('roles')?.value || [];
+  // Variables para manejar roles
+  selectedRole: string = '';
 
-    if (isChecked) {
-      // Add role if not already in the array
-      if (!currentRoles.includes(roleName)) {
-        this.userForm.get('roles')?.setValue([...currentRoles, roleName]);
+  // Método para obtener el error del campo role
+  getRoleError(): string | null {
+    const roleControl = this.userForm.get('role');
+    if (roleControl?.errors && roleControl.touched) {
+      if (roleControl.errors['required']) {
+        return 'Debe seleccionar un rol';
       }
-    } else {
-      // Remove role if it exists in the array
-      this.userForm.get('roles')?.setValue(currentRoles.filter((r: string) => r !== roleName));
     }
-
-    // Mark the form as dirty since we're updating it programmatically
-    this.userForm.markAsDirty();
+    return null;
   }
 
   ngOnInit(): void {
@@ -158,10 +165,11 @@ export class UsersComponent implements OnInit {
   }
 
   loadRoles(): void {
-    this.http.get<ApiResponse>(`${environment.apiUrl}/roles`).subscribe({
+    this.http.get<ApiResponse>(`${environment.apiUrl}/users/available-roles`).subscribe({
       next: (response) => {
         if (response.success) {
           this.roles.set(response.data.roles || []);
+          this.availableRoles.set(response.data.roles || []);
         }
       },
       error: (error) => {
@@ -172,28 +180,47 @@ export class UsersComponent implements OnInit {
 
   // Modal methods
   openCreateModal(): void {
-    this.userForm.reset();
-    this.userForm.patchValue({
-      password: '',
-      password_confirmation: '',
-      roles: []
+    this.isEditing.set(false);
+    // Reiniciar rol seleccionado
+    this.selectedRole = '';
+
+    this.userForm.reset({
+      activo: true,
+      role: ''
     });
+    // Reset validators for create mode
+    this.userForm.get('password')?.setValidators([Validators.required, Validators.minLength(8)]);
+    this.userForm.get('password_confirmation')?.setValidators([Validators.required]);
+    this.userForm.get('role')?.setValidators([Validators.required]);
+    this.userForm.updateValueAndValidity();
     this.showCreateModal.set(true);
   }
 
   openEditModal(user: User): void {
-    this.isEditing.set(true);
     this.selectedUser.set(user);
+    this.isEditing.set(true);
+
+    // Inicializar el rol seleccionado (tomar el primer rol si existe)
+    this.selectedRole = user.roles && user.roles.length > 0 ? user.roles[0].name : '';
+    console.log('Rol inicializado en edición:', this.selectedRole);
+
     this.userForm.patchValue({
       name: user.name,
       email: user.email,
+      fecha_nacimiento: user.fecha_nacimiento || '',
+      pais: user.pais || '',
+      genero: user.genero || '',
+      telefono: user.telefono || '',
+      activo: user.activo === undefined ? true : user.activo,
       password: '',
       password_confirmation: '',
-      roles: user.roles?.map(role => role.name) || []
+      role: this.selectedRole
     });
     // Clear password validators for edit mode
     this.userForm.get('password')?.clearValidators();
     this.userForm.get('password_confirmation')?.clearValidators();
+    // Keep role validator for edit mode
+    this.userForm.get('role')?.setValidators([Validators.required]);
     this.userForm.updateValueAndValidity();
     this.showEditModal.set(true);
   }
@@ -209,26 +236,37 @@ export class UsersComponent implements OnInit {
     this.showDeleteModal.set(false);
     this.selectedUser.set(null);
     this.isEditing.set(false);
+    this.selectedRole = '';
     this.userForm.reset();
     // Reset validators
     this.userForm.get('password')?.setValidators([Validators.minLength(8)]);
     this.userForm.get('password_confirmation')?.setValidators([]);
+    this.userForm.get('role')?.setValidators([]);
     this.userForm.updateValueAndValidity();
   }
 
   // CRUD operations
   private prepareUserData(formData: any): any {
-    const data = { ...formData };
-    // Remove password fields if they are empty (edit mode)
-    if (this.isEditing() && !data.password) {
-      delete data.password;
-      delete data.password_confirmation;
+    const userData: any = {
+      name: formData.name,
+      email: formData.email,
+      fecha_nacimiento: formData.fecha_nacimiento || '',
+      pais: formData.pais || '',
+      genero: formData.genero || '',
+      telefono: formData.telefono || '',
+      activo: formData.activo === undefined ? true : formData.activo,
+      roles: [formData.role] // Convertir el rol único a array para el backend
+    };
+
+    // Only include password if it's provided
+    if (formData.password) {
+      userData.password = formData.password;
+      userData.password_confirmation = formData.password_confirmation;
     }
-    // Ensure roles is an array of role names
-    if (Array.isArray(data.roles)) {
-      data.roles = data.roles.map((role: any) => typeof role === 'object' ? role.name : role);
-    }
-    return data;
+
+    console.log('Rol seleccionado:', formData.role);
+
+    return userData;
   }
 
   createUser(): void {
@@ -236,10 +274,26 @@ export class UsersComponent implements OnInit {
       this.isLoading.set(true);
       const formData = this.prepareUserData(this.userForm.value);
 
+      console.log('Enviando datos para crear usuario:', formData);
+
       this.http.post<ApiResponse>(`${environment.apiUrl}/users`, formData).subscribe({
-        next: (response) => this.handleUserOperationResponse(response, 'crear'),
-        error: (error) => this.handleUserOperationError(error, 'crear')
+        next: (response) => {
+          console.log('Respuesta al crear usuario:', response);
+          this.handleUserOperationResponse(response, 'crear');
+        },
+        error: (error) => {
+          console.error('Error al crear usuario:', error);
+          this.handleUserOperationError(error, 'crear');
+        }
       });
+    } else {
+      console.warn('Formulario inválido:', this.userForm.errors);
+      // Marcar todos los campos como touched para mostrar errores
+      Object.keys(this.userForm.controls).forEach(key => {
+        this.userForm.get(key)?.markAsTouched();
+      });
+      this.errorMessage.set('Por favor complete todos los campos obligatorios');
+      setTimeout(() => this.errorMessage.set(''), 3000);
     }
   }
 
@@ -249,10 +303,26 @@ export class UsersComponent implements OnInit {
       const formData = this.prepareUserData(this.userForm.value);
       const userId = this.selectedUser()!.id;
 
+      console.log('Enviando datos para actualizar usuario:', formData);
+
       this.http.put<ApiResponse>(`${environment.apiUrl}/users/${userId}`, formData).subscribe({
-        next: (response) => this.handleUserOperationResponse(response, 'actualizar'),
-        error: (error) => this.handleUserOperationError(error, 'actualizar')
+        next: (response) => {
+          console.log('Respuesta al actualizar usuario:', response);
+          this.handleUserOperationResponse(response, 'actualizar');
+        },
+        error: (error) => {
+          console.error('Error al actualizar usuario:', error);
+          this.handleUserOperationError(error, 'actualizar');
+        }
       });
+    } else {
+      console.warn('Formulario inválido o usuario no seleccionado');
+      // Marcar todos los campos como touched para mostrar errores
+      Object.keys(this.userForm.controls).forEach(key => {
+        this.userForm.get(key)?.markAsTouched();
+      });
+      this.errorMessage.set('Por favor complete todos los campos obligatorios');
+      setTimeout(() => this.errorMessage.set(''), 3000);
     }
   }
 
@@ -371,7 +441,7 @@ export class UsersComponent implements OnInit {
       'email': 'El correo electrónico',
       'password': 'La contraseña',
       'password_confirmation': 'La confirmación de contraseña',
-      'roles': 'Los roles'
+      'role': 'El rol'
     };
     return names[fieldName] || 'Este campo';
   }

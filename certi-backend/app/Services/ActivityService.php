@@ -16,8 +16,7 @@ class ActivityService
      */
     public function getAll(int $perPage = 15): LengthAwarePaginator
     {
-        return Activity::with('company')
-            ->withCount('certificates')
+        return Activity::withCount('certificates')
             ->orderByDesc('id')
             ->paginate($perPage);
     }
@@ -27,7 +26,7 @@ class ActivityService
      */
     public function search(array $criteria, int $perPage = 15): LengthAwarePaginator
     {
-        $query = Activity::with('company')->withCount('certificates');
+        $query = Activity::withCount('certificates');
 
         if (!empty($criteria['search'])) {
             $search = $criteria['search'];
@@ -35,10 +34,6 @@ class ActivityService
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('description', 'like', "%{$search}%");
             });
-        }
-
-        if (!empty($criteria['company_id'])) {
-            $query->where('company_id', $criteria['company_id']);
         }
 
         // Si existe una columna is_active, permitir filtrar por ella; de lo contrario, ignorar
@@ -54,7 +49,7 @@ class ActivityService
      */
     public function getById(int $id): ?Activity
     {
-        return Activity::with(['company'])->withCount('certificates')->find($id);
+        return Activity::withCount('certificates')->find($id);
     }
 
     /**
@@ -97,15 +92,13 @@ class ActivityService
     }
 
     /**
-     * Actividades por empresa
+     * Obtener todas las actividades (sin paginación)
      */
-    public function getByCompany(int $companyId, int $perPage = 15): LengthAwarePaginator
+    public function getAllActivities(): \Illuminate\Database\Eloquent\Collection
     {
-        return Activity::with('company')
-            ->withCount('certificates')
-            ->where('company_id', $companyId)
+        return Activity::withCount('certificates')
             ->orderByDesc('id')
-            ->paginate($perPage);
+            ->get();
     }
 
     /**

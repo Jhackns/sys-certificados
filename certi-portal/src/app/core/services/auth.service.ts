@@ -111,8 +111,20 @@ export class AuthService {
    * Cierra la sesión del usuario
    */
   logout(): void {
+    console.log('🔐 Cerrando sesión...');
+    this.clearAuth();
+    // No redirigir automáticamente aquí para evitar conflictos con la inicialización
+    console.log('✅ Sesión cerrada correctamente');
+  }
+
+  /**
+   * Cierra la sesión del usuario y redirige al login
+   */
+  logoutAndRedirect(): void {
+    console.log('🔐 Cerrando sesión y redirigiendo...');
     this.clearAuth();
     this.router.navigate(['/login']);
+    console.log('✅ Sesión cerrada y redirigido a login');
   }
 
   /**
@@ -140,7 +152,7 @@ export class AuthService {
    * Establece el estado de autenticación
    */
   private setAuth(user: User, token: string): void {
-    console.log('Estableciendo autenticación para usuario:', user.name);
+    // Seguridad: no loggear token ni datos sensibles en consola
     localStorage.setItem(this.TOKEN_KEY, token);
     localStorage.setItem(this.USER_KEY, JSON.stringify(user));
 
@@ -149,7 +161,6 @@ export class AuthService {
       user,
       token
     });
-    console.log('Estado de autenticación actualizado:', this.authState());
   }
 
   /**

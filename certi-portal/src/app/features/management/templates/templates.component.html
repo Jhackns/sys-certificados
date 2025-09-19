@@ -1,0 +1,426 @@
+<div class="templates-page">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>Gestión de Plantillas</h1>
+      <p>Administra las plantillas de certificados del sistema</p>
+    </div>
+    <button class="btn btn-primary" (click)="openCreateModal()">
+      <i class="fas fa-plus"></i>
+      Nueva Plantilla
+    </button>
+  </div>
+
+  <!-- Mensajes de alerta -->
+  <div class="alert alert-success" *ngIf="successMessage()">
+    <i class="fas fa-check-circle"></i>
+    {{ successMessage() }}
+  </div>
+
+  <div class="alert alert-error" *ngIf="errorMessage()">
+    <i class="fas fa-exclamation-circle"></i>
+    {{ errorMessage() }}
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters-section">
+    <form [formGroup]="filterForm" class="filters-form">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input 
+          type="text" 
+          class="form-control" 
+          placeholder="Buscar plantillas..." 
+          formControlName="search"
+        >
+      </div>
+      
+      <div class="filter-group">
+        <select class="form-control" formControlName="activity_type">
+          <option value="">Todos los tipos</option>
+          <option *ngFor="let type of activityTypes" [value]="type.value">
+            {{ type.label }}
+          </option>
+        </select>
+        
+        <select class="form-control" formControlName="status">
+          <option value="">Todos los estados</option>
+          <option *ngFor="let status of statusOptions" [value]="status.value">
+            {{ status.label }}
+          </option>
+        </select>
+        
+        <button type="button" class="btn btn-primary" (click)="applyFilters()">
+          <i class="fas fa-filter"></i>
+          Filtrar
+        </button>
+        
+        <button type="button" class="btn btn-secondary" (click)="clearFilters()">
+          <i class="fas fa-times"></i>
+          Limpiar
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Tabla de plantillas -->
+  <div class="table-container">
+    <table class="templates-table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Tipo de Actividad</th>
+          <th>Estado</th>
+          <th>Fecha de Creación</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="isLoading()">
+          <td colspan="5" class="loading-row">
+            <div class="loading-spinner">
+              <i class="fas fa-spinner fa-spin"></i>
+              Cargando plantillas...
+            </div>
+          </td>
+        </tr>
+        
+        <tr *ngIf="!isLoading() && filteredTemplates().length === 0">
+          <td colspan="5" class="empty-row">
+            <div class="empty-state">
+              <i class="fas fa-file-alt"></i>
+              <p>No se encontraron plantillas</p>
+            </div>
+          </td>
+        </tr>
+        
+        <tr *ngFor="let template of filteredTemplates()" class="template-row">
+          <td>
+            <div class="template-info">
+              <strong>{{ template.name }}</strong>
+              <small *ngIf="template.description">{{ template.description }}</small>
+            </div>
+          </td>
+          <td>
+            <span class="type-badge" [class]="template.activity_type">
+              {{ getActivityTypeLabel(template.activity_type) }}
+            </span>
+          </td>
+          <td>
+            <span class="badge" [class]="template.status">
+              {{ getStatusLabel(template.status) }}
+            </span>
+          </td>
+          <td>{{ template.created_at | date:'dd/MM/yyyy' }}</td>
+          <td>
+            <div class="action-buttons">
+              <button 
+                class="btn-icon btn-view" 
+                (click)="openViewModal(template)"
+                title="Ver detalles"
+              >
+                <i class="fas fa-eye"></i>
+              </button>
+              <button 
+                class="btn-icon btn-edit" 
+                (click)="openEditModal(template)"
+                title="Editar"
+              >
+                <i class="fas fa-edit"></i>
+              </button>
+              <button 
+                class="btn-icon btn-toggle" 
+                (click)="toggleTemplateStatus(template)"
+                [title]="template.status === 'active' ? 'Desactivar' : 'Activar'"
+              >
+                <i class="fas" [class]="template.status === 'active' ? 'fa-eye-slash' : 'fa-eye'"></i>
+              </button>
+              <button 
+                class="btn-icon btn-delete" 
+                (click)="openDeleteModal(template)"
+                title="Eliminar"
+              >
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Paginación -->
+  <div class="pagination-container" *ngIf="totalPages() > 1">
+    <div class="pagination-info">
+      Mostrando {{ (currentPage() - 1) * perPage() + 1 }} - 
+      {{ Math.min(currentPage() * perPage(), totalItems()) }} de {{ totalItems() }} plantillas
+    </div>
+    
+    <nav class="pagination">
+      <button 
+        class="page-link" 
+        [disabled]="currentPage() === 1"
+        (click)="goToPage(currentPage() - 1)"
+      >
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      
+      <button 
+        *ngFor="let page of [].constructor(totalPages()); let i = index"
+        class="page-link"
+        [class.active]="currentPage() === i + 1"
+        (click)="goToPage(i + 1)"
+      >
+        {{ i + 1 }}
+      </button>
+      
+      <button 
+        class="page-link" 
+        [disabled]="currentPage() === totalPages()"
+        (click)="goToPage(currentPage() + 1)"
+      >
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </nav>
+  </div>
+</div>
+
+<!-- Modal para crear plantilla -->
+<div class="modal-overlay" *ngIf="showCreateModal()" (click)="closeModals()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Nueva Plantilla</h3>
+      <button class="btn-close" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <form [formGroup]="templateForm" (ngSubmit)="createTemplate()">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input 
+            class="form-control" 
+            type="text" 
+            formControlName="name"
+            placeholder="Nombre de la plantilla"
+          >
+          <div class="error-message" *ngIf="templateForm.get('name')?.touched && templateForm.get('name')?.errors">
+            <span *ngIf="templateForm.get('name')?.errors?.['required']">El nombre es requerido</span>
+            <span *ngIf="templateForm.get('name')?.errors?.['minlength']">El nombre debe tener al menos 3 caracteres</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Descripción</label>
+          <textarea 
+            class="form-control" 
+            formControlName="description"
+            placeholder="Descripción de la plantilla"
+            rows="3"
+          ></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>Tipo de Actividad *</label>
+          <select class="form-control" formControlName="activity_type">
+            <option *ngFor="let type of activityTypes" [value]="type.value">
+              {{ type.label }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Estado *</label>
+          <select class="form-control" formControlName="status">
+            <option *ngFor="let status of statusOptions" [value]="status.value">
+              {{ status.label }}
+            </option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeModals()">
+          Cancelar
+        </button>
+        <button 
+          type="submit" 
+          class="btn btn-primary" 
+          [disabled]="templateForm.invalid || isLoading()"
+        >
+          <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
+          Crear Plantilla
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal para editar plantilla -->
+<div class="modal-overlay" *ngIf="showEditModal()" (click)="closeModals()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Editar Plantilla</h3>
+      <button class="btn-close" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <form [formGroup]="templateForm" (ngSubmit)="updateTemplate()">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input 
+            class="form-control" 
+            type="text" 
+            formControlName="name"
+            placeholder="Nombre de la plantilla"
+          >
+          <div class="error-message" *ngIf="templateForm.get('name')?.touched && templateForm.get('name')?.errors">
+            <span *ngIf="templateForm.get('name')?.errors?.['required']">El nombre es requerido</span>
+            <span *ngIf="templateForm.get('name')?.errors?.['minlength']">El nombre debe tener al menos 3 caracteres</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Descripción</label>
+          <textarea 
+            class="form-control" 
+            formControlName="description"
+            placeholder="Descripción de la plantilla"
+            rows="3"
+          ></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>Tipo de Actividad *</label>
+          <select class="form-control" formControlName="activity_type">
+            <option *ngFor="let type of activityTypes" [value]="type.value">
+              {{ type.label }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Estado *</label>
+          <select class="form-control" formControlName="status">
+            <option *ngFor="let status of statusOptions" [value]="status.value">
+              {{ status.label }}
+            </option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeModals()">
+          Cancelar
+        </button>
+        <button 
+          type="submit" 
+          class="btn btn-primary" 
+          [disabled]="templateForm.invalid || isLoading()"
+        >
+          <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
+          Actualizar Plantilla
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal para confirmar eliminación -->
+<div class="modal-overlay" *ngIf="showDeleteModal()" (click)="closeModals()">
+  <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Confirmar Eliminación</h3>
+      <button class="btn-close" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <p>¿Estás seguro de que deseas eliminar la plantilla <strong>{{ selectedTemplate()?.name }}</strong>?</p>
+      <p class="text-danger">Esta acción no se puede deshacer.</p>
+    </div>
+    
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeModals()">
+        Cancelar
+      </button>
+      <button 
+        type="button" 
+        class="btn btn-danger" 
+        (click)="deleteTemplate()"
+        [disabled]="isLoading()"
+      >
+        <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
+        Eliminar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para ver detalles -->
+<div class="modal-overlay" *ngIf="showViewModal()" (click)="closeModals()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Detalles de la Plantilla</h3>
+      <button class="btn-close" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body" *ngIf="selectedTemplate()">
+      <div class="template-details">
+        <div class="detail-row">
+          <strong>Nombre:</strong>
+          <span>{{ selectedTemplate()?.name }}</span>
+        </div>
+        
+        <div class="detail-row" *ngIf="selectedTemplate()?.description">
+          <strong>Descripción:</strong>
+          <span>{{ selectedTemplate()?.description }}</span>
+        </div>
+        
+        <div class="detail-row">
+          <strong>Tipo de Actividad:</strong>
+          <span class="type-badge" [class]="selectedTemplate()?.activity_type">
+            {{ getActivityTypeLabel(selectedTemplate()?.activity_type || '') }}
+          </span>
+        </div>
+        
+        <div class="detail-row">
+          <strong>Estado:</strong>
+          <span class="badge" [class]="selectedTemplate()?.status">
+            {{ getStatusLabel(selectedTemplate()?.status || '') }}
+          </span>
+        </div>
+        
+        <div class="detail-row">
+          <strong>Fecha de Creación:</strong>
+          <span>{{ selectedTemplate()?.created_at | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        
+        <div class="detail-row">
+          <strong>Última Actualización:</strong>
+          <span>{{ selectedTemplate()?.updated_at | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeModals()">
+        Cerrar
+      </button>
+      <button 
+        type="button" 
+        class="btn btn-primary" 
+        (click)="openEditModal(selectedTemplate()!)"
+      >
+        <i class="fas fa-edit"></i>
+        Editar
+      </button>
+    </div>
+  </div>
+</div>

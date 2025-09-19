@@ -12,25 +12,32 @@ class Certificate extends Model
     use HasFactory;
 
     protected $fillable = [
-        'company_id',
         'user_id',
         'activity_id',
+        'id_template',
+        'signed_by',
+        'nombre',
+        'descripcion',
         'unique_code',
         'qr_url',
+        'fecha_emision',
+        'fecha_vencimiento',
         'issued_at',
-        'signed_by',
+        'status',
     ];
 
     protected $casts = [
         'issued_at' => 'datetime',
+        'fecha_emision' => 'date',
+        'fecha_vencimiento' => 'date',
     ];
 
     /**
-     * Relación con empresa
+     * Relación con plantilla de certificado
      */
-    public function company(): BelongsTo
+    public function template(): BelongsTo
     {
-        return $this->belongsTo(Company::class);
+        return $this->belongsTo(CertificateTemplate::class, 'id_template');
     }
 
     /**

@@ -26,7 +26,7 @@ export class PrincipalComponent {
   }
 
   logout(): void {
-    this.authService.logout();
+    this.authService.logoutAndRedirect();
   }
 
   getGreeting(): string {

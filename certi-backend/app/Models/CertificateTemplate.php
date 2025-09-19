@@ -11,21 +11,12 @@ class CertificateTemplate extends Model
     use HasFactory;
 
     protected $fillable = [
-        'company_id',
         'name',
         'description',
         'file_path',
         'activity_type',
         'status',
     ];
-
-    /**
-     * Relación con empresa
-     */
-    public function company(): BelongsTo
-    {
-        return $this->belongsTo(Company::class);
-    }
 
     /**
      * Scope para plantillas activas

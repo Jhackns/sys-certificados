@@ -8,7 +8,6 @@ use App\Http\Controllers\API\Auth\AuthController;
 use App\Http\Controllers\API\AccessControl\UserController;
 use App\Http\Controllers\API\AccessControl\RoleController;
 use App\Http\Controllers\API\AccessControl\PermissionController;
-use App\Http\Controllers\API\Companies\CompanyController;
 use App\Http\Controllers\API\Activities\ActivityController;
 use App\Http\Controllers\API\Certificates\CertificateController;
 use App\Http\Controllers\API\Certificates\ValidationController;
@@ -46,15 +45,6 @@ Route::prefix('public')->group(function () {
 });
 
 // === CONSULTAS PÚBLICAS ===
-Route::prefix('public')->group(function () {
-    // Información básica de empresas (para formularios públicos)
-    Route::get('/companies', [CompanyController::class, 'index']);
-    Route::get('/companies/{id}', [CompanyController::class, 'show']);
-
-    // Actividades públicas por empresa
-    Route::get('/companies/{companyId}/activities', [ActivityController::class, 'byCompany']);
-});
-
 /*
 |--------------------------------------------------------------------------
 | RUTAS PROTEGIDAS CON AUTENTICACIÓN
@@ -84,16 +74,22 @@ Route::middleware('auth:sanctum')->group(function () {
     */
 
     // === GESTIÓN DE USUARIOS ===
-    Route::prefix('users')->middleware('permission:users.read')->group(function () {
-        Route::get('/', [UserController::class, 'index']);
-        Route::get('/{id}', [UserController::class, 'show']);
-        Route::post('/', [UserController::class, 'store'])->middleware('permission:users.create');
-        Route::put('/{id}', [UserController::class, 'update'])->middleware('permission:users.update');
-        Route::delete('/{id}', [UserController::class, 'destroy'])->middleware('permission:users.delete');
-
-        // Gestión de roles de usuario
-        Route::post('/{id}/assign-roles', [UserController::class, 'assignRoles'])->middleware('permission:users.assign_roles');
+    Route::prefix('users')->group(function () {
+        // Endpoint para obtener roles disponibles (tiene su propia verificación de permisos)
         Route::get('/available-roles', [UserController::class, 'availableRoles']);
+
+        // Rutas que requieren permission:users.read
+        Route::middleware('permission:users.read')->group(function () {
+            Route::get('/', [UserController::class, 'index']);
+            Route::get('/list', [UserController::class, 'list']); // Para dropdowns
+            Route::get('/{id}', [UserController::class, 'show']);
+            Route::post('/', [UserController::class, 'store'])->middleware('permission:users.create');
+            Route::put('/{id}', [UserController::class, 'update'])->middleware('permission:users.update');
+            Route::delete('/{id}', [UserController::class, 'destroy'])->middleware('permission:users.delete');
+
+            // Gestión de roles de usuario
+            Route::post('/{id}/assign-roles', [UserController::class, 'assignRoles'])->middleware('permission:users.assign_roles');
+        });
     });
 
     // === GESTIÓN DE ROLES ===
@@ -120,23 +116,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [PermissionController::class, 'destroy'])->middleware('permission:permissions.delete');
     });
 
-    // === GESTIÓN DE EMPRESAS ===
-    Route::prefix('companies')->middleware('permission:companies.read')->group(function () {
-        Route::get('/', [CompanyController::class, 'index']);
-        Route::get('/{id}', [CompanyController::class, 'show']);
-        Route::post('/', [CompanyController::class, 'store'])->middleware('permission:companies.create');
-        Route::put('/{id}', [CompanyController::class, 'update'])->middleware('permission:companies.update');
-        Route::delete('/{id}', [CompanyController::class, 'destroy'])->middleware('permission:companies.delete');
-
-        // Funcionalidades especiales
-        Route::patch('/{id}/toggle-status', [CompanyController::class, 'toggleStatus'])->middleware('permission:companies.update');
-        Route::get('/{id}/statistics', [CompanyController::class, 'statistics']);
-        Route::get('/{id}/users', [CompanyController::class, 'users']);
-    });
-
     // === GESTIÓN DE ACTIVIDADES ===
     Route::prefix('activities')->middleware('permission:activities.read')->group(function () {
         Route::get('/', [ActivityController::class, 'index']);
+        Route::get('/list', [ActivityController::class, 'list']); // Para dropdowns
         Route::get('/{id}', [ActivityController::class, 'show']);
         Route::post('/', [ActivityController::class, 'store'])->middleware('permission:activities.create');
         Route::put('/{id}', [ActivityController::class, 'update'])->middleware('permission:activities.update');
@@ -144,14 +127,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Funcionalidades especiales
         Route::patch('/{id}/toggle-status', [ActivityController::class, 'toggleStatus'])->middleware('permission:activities.update');
-        Route::get('/company/{companyId}', [ActivityController::class, 'byCompany']);
         Route::get('/{id}/certificates', [ActivityController::class, 'certificates']);
     });
 
     // === GESTIÓN DE PLANTILLAS DE CERTIFICADOS ===
     Route::prefix('certificate-templates')->middleware('permission:templates.read')->group(function () {
         Route::get('/', [CertificateTemplateController::class, 'index']);
+        Route::get('/list', [CertificateTemplateController::class, 'list']); // Para dropdowns
         Route::get('/{id}', [CertificateTemplateController::class, 'show']);
+        Route::get('/{id}/preview', [CertificateTemplateController::class, 'preview']); // Para vista previa
         Route::post('/', [CertificateTemplateController::class, 'store'])->middleware('permission:templates.create');
         Route::put('/{id}', [CertificateTemplateController::class, 'update'])->middleware('permission:templates.update');
         Route::delete('/{id}', [CertificateTemplateController::class, 'destroy'])->middleware('permission:templates.delete');
@@ -159,7 +143,6 @@ Route::middleware('auth:sanctum')->group(function () {
         // Funcionalidades especiales
         Route::patch('/{id}/toggle-status', [CertificateTemplateController::class, 'toggleStatus'])->middleware('permission:templates.update');
         Route::post('/{id}/clone', [CertificateTemplateController::class, 'clone'])->middleware('permission:templates.create');
-        Route::get('/company/{companyId}', [CertificateTemplateController::class, 'byCompany']);
     });
 
     // === GESTIÓN DE CERTIFICADOS ===
@@ -178,12 +161,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Estadísticas y reportes
         Route::get('/statistics/overview', [CertificateController::class, 'statisticsOverview'])->middleware('permission:reports.certificates');
-        Route::get('/statistics/by-company', [CertificateController::class, 'statisticsByCompany'])->middleware('permission:reports.certificates');
         Route::get('/statistics/by-activity', [CertificateController::class, 'statisticsByActivity'])->middleware('permission:reports.certificates');
 
         // Búsquedas y filtros
         Route::get('/search', [CertificateController::class, 'search']);
-        Route::get('/company/{companyId}', [CertificateController::class, 'byCompany']);
         Route::get('/activity/{activityId}', [CertificateController::class, 'byActivity']);
     });
 

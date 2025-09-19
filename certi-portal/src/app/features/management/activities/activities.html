@@ -1,0 +1,228 @@
+<div class="activities-page">
+  <div class="page-header">
+    <h1>Gestión de Actividades</h1>
+    <button class="btn btn-primary" (click)="openCreateModal()">
+      <i class="fas fa-plus"></i> Nueva Actividad
+    </button>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters-section">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input 
+        type="text" 
+        placeholder="Buscar actividades..." 
+        (input)="onSearchChange($event)"
+        [value]="searchTerm()"
+      >
+    </div>
+    
+    <div class="filter-group">
+      <select (change)="onStatusFilterChange($event)" [value]="statusFilter()">
+        <option value="all">Todos los estados</option>
+        <option value="active">Activas</option>
+        <option value="inactive">Inactivas</option>
+      </select>
+      
+      <select (change)="onTypeFilterChange($event)" [value]="typeFilter()">
+        <option value="all">Todos los tipos</option>
+        <option value="course">Cursos</option>
+        <option value="event">Eventos</option>
+        <option value="other">Otros</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Tabla de actividades -->
+  <div class="table-container">
+    <table class="activities-table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Tipo</th>
+          <th>Duración (hrs)</th>
+          <th>Fecha Inicio</th>
+          <th>Fecha Fin</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="loading()">
+          <td colspan="7" class="loading-row">
+            <div class="loading-spinner">
+              <i class="fas fa-spinner fa-spin"></i> Cargando actividades...
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="!loading() && filteredActivities().length === 0">
+          <td colspan="7" class="empty-row">
+            <div class="empty-state">
+              <i class="fas fa-calendar-alt"></i>
+              <p>No se encontraron actividades</p>
+            </div>
+          </td>
+        </tr>
+        <tr *ngFor="let activity of filteredActivities()">
+          <td>
+            <div class="activity-info">
+              <strong>{{ activity.name }}</strong>
+              <small *ngIf="activity.description">{{ activity.description }}</small>
+            </div>
+          </td>
+          <td>
+            <span class="type-badge type-{{ activity.type }}">
+              {{ getTypeText(activity.type) }}
+            </span>
+          </td>
+          <td>{{ activity.duration_hours || '-' }}</td>
+          <td>{{ formatDate(activity.start_date) }}</td>
+          <td>{{ formatDate(activity.end_date) }}</td>
+          <td>
+            <span class="badge" [class]="getStatusBadgeClass(activity.is_active)">
+              {{ getStatusText(activity.is_active) }}
+            </span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button 
+                class="btn-icon btn-edit" 
+                (click)="openEditModal(activity)"
+                title="Editar"
+              >
+                <i class="fas fa-edit"></i>
+              </button>
+              <button 
+                class="btn-icon btn-toggle" 
+                (click)="toggleActivityStatus(activity)"
+                [title]="activity.is_active ? 'Desactivar' : 'Activar'"
+              >
+                <i class="fas" [class]="activity.is_active ? 'fa-eye-slash' : 'fa-eye'"></i>
+              </button>
+              <button 
+                class="btn-icon btn-delete" 
+                (click)="deleteActivity(activity)"
+                title="Eliminar"
+              >
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal para crear/editar actividad -->
+<div class="modal-overlay" *ngIf="showModal()" (click)="closeModal()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ editingActivity() ? 'Editar Actividad' : 'Nueva Actividad' }}</h3>
+      <button class="btn-close" (click)="closeModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <form [formGroup]="activityForm" (ngSubmit)="onSubmit()">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombre *</label>
+            <input 
+              class="form-control" 
+              type="text" 
+              formControlName="name"
+              placeholder="Nombre de la actividad"
+            >
+            <div class="error-message" *ngIf="activityForm.get('name')?.invalid && activityForm.get('name')?.touched">
+              <span *ngIf="activityForm.get('name')?.errors?.['required']">El nombre es requerido</span>
+              <span *ngIf="activityForm.get('name')?.errors?.['minlength']">El nombre debe tener al menos 3 caracteres</span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Tipo *</label>
+            <select class="form-control" formControlName="type">
+              <option value="course">Curso</option>
+              <option value="event">Evento</option>
+              <option value="other">Otro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Descripción</label>
+          <textarea 
+            class="form-control" 
+            formControlName="description"
+            placeholder="Descripción de la actividad"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Duración (horas)</label>
+            <input 
+              class="form-control" 
+              type="number" 
+              formControlName="duration_hours"
+              placeholder="Ej: 40"
+              min="1"
+            >
+            <div class="error-message" *ngIf="activityForm.get('duration_hours')?.invalid && activityForm.get('duration_hours')?.touched">
+              <span *ngIf="activityForm.get('duration_hours')?.errors?.['min']">La duración debe ser mayor a 0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Fecha de inicio</label>
+            <input 
+              class="form-control" 
+              type="date" 
+              formControlName="start_date"
+            >
+          </div>
+          
+          <div class="form-group">
+            <label>Fecha de fin</label>
+            <input 
+              class="form-control" 
+              type="date" 
+              formControlName="end_date"
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input 
+              type="checkbox" 
+              formControlName="is_active"
+            >
+            <span class="checkmark"></span>
+            Actividad activa
+          </label>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeModal()">
+          Cancelar
+        </button>
+        <button 
+          type="submit" 
+          class="btn btn-primary" 
+          [disabled]="activityForm.invalid || loading()"
+        >
+          <i class="fas fa-spinner fa-spin" *ngIf="loading()"></i>
+          {{ editingActivity() ? 'Actualizar' : 'Crear' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
