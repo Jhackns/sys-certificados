@@ -35,11 +35,6 @@ class UserController extends Controller
             $query = User::with(['roles', 'permissions']);
 
             // Filtros
-            // Elimina filtro por company_id
-            // if ($request->has('company_id')) {
-            //     $query->where('company_id', $request->company_id);
-            // }
-
             if ($request->has('search')) {
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
@@ -146,6 +141,7 @@ class UserController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
+                'email_verified_at' => now(), // Marcar email como verificado al crear
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'pais' => $request->pais,
                 'genero' => $request->genero,
@@ -211,9 +207,6 @@ class UserController extends Controller
             if ($request->has('roles')) {
                 $user->syncRoles($request->roles);
             }
-
-            // Elimina 'company_id' de $data si existe
-            unset($data['company_id']);
 
             return $this->successResponse([
                 'user' => new UserResource($user->load(['roles'])) // Elimina 'company'

@@ -8,6 +8,7 @@ interface User {
   id: number;
   name: string;
   email: string;
+  email_verified_at?: string | null;
   fecha_nacimiento?: string | null;
   pais?: string | null;
   genero?: string | null;
@@ -57,10 +58,16 @@ export class UsersComponent implements OnInit {
 
   // Format user roles for display
   getUserRoles(user: User): string {
-    // Si user.roles es un array, únelos por coma, si no, muestra 'Sin rol'
-    return Array.isArray(user.roles) && user.roles.length > 0
-      ? user.roles.join(', ')
-      : 'Sin rol';
+    // Si user.roles es un array de strings (nombres de roles), únelos por coma
+    // Si user.roles es un array de objetos Role, extrae los nombres
+    if (Array.isArray(user.roles) && user.roles.length > 0) {
+      if (typeof user.roles[0] === 'string') {
+        return user.roles.join(', ');
+      } else if (typeof user.roles[0] === 'object' && user.roles[0].name) {
+        return user.roles.map(role => role.name).join(', ');
+      }
+    }
+    return 'Sin rol';
   }
 
   // Forms
@@ -201,13 +208,30 @@ export class UsersComponent implements OnInit {
     this.isEditing.set(true);
 
     // Inicializar el rol seleccionado (tomar el primer rol si existe)
-    this.selectedRole = user.roles && user.roles.length > 0 ? user.roles[0].name : '';
+    let userRole = '';
+    if (user.roles && user.roles.length > 0) {
+      if (typeof user.roles[0] === 'string') {
+        userRole = user.roles[0];
+      } else if (typeof user.roles[0] === 'object' && user.roles[0].name) {
+        userRole = user.roles[0].name;
+      }
+    }
+    this.selectedRole = userRole;
     console.log('Rol inicializado en edición:', this.selectedRole);
+
+    // Formatear fecha para input type="date" (YYYY-MM-DD)
+    let formattedDate = '';
+    if (user.fecha_nacimiento) {
+      const date = new Date(user.fecha_nacimiento);
+      if (!isNaN(date.getTime())) {
+        formattedDate = date.toISOString().split('T')[0];
+      }
+    }
 
     this.userForm.patchValue({
       name: user.name,
       email: user.email,
-      fecha_nacimiento: user.fecha_nacimiento || '',
+      fecha_nacimiento: formattedDate,
       pais: user.pais || '',
       genero: user.genero || '',
       telefono: user.telefono || '',
