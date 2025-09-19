@@ -6,7 +6,6 @@ use App\Models\Activity;
 use App\Models\Certificate;
 use App\Models\CertificateDocument;
 use App\Models\CertificateTemplate;
-use App\Models\Company;
 use App\Models\EmailSend;
 use App\Models\User;
 use App\Models\Validation;

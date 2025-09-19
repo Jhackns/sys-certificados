@@ -47,6 +47,7 @@ class RoleController extends Controller
                 $roleData = [
                     'id' => $role->id,
                     'name' => $role->name,
+                    'description' => $role->description,
                     'guard_name' => $role->guard_name,
                     'permissions' => $role->permissions->pluck('name'),
                     'permissions_count' => $role->permissions->count(),
@@ -125,6 +126,7 @@ class RoleController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255|unique:roles,name',
+            'description' => 'nullable|string|max:500',
             'guard_name' => 'sometimes|string|max:255',
             'permissions' => 'sometimes|array',
             'permissions.*' => 'exists:permissions,name',
@@ -137,6 +139,7 @@ class RoleController extends Controller
         try {
             $role = Role::create([
                 'name' => $request->name,
+                'description' => $request->description,
                 'guard_name' => $request->guard_name ?? 'web',
             ]);
 
@@ -149,6 +152,7 @@ class RoleController extends Controller
                 'role' => [
                     'id' => $role->id,
                     'name' => $role->name,
+                    'description' => $role->description,
                     'guard_name' => $role->guard_name,
                     'permissions' => $role->permissions->pluck('name'),
                     'created_at' => $role->created_at,
@@ -174,6 +178,7 @@ class RoleController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'name' => 'sometimes|required|string|max:255|unique:roles,name,' . $id,
+                'description' => 'sometimes|nullable|string|max:500',
                 'guard_name' => 'sometimes|string|max:255',
                 'permissions' => 'sometimes|array',
                 'permissions.*' => 'exists:permissions,name',
@@ -195,6 +200,7 @@ class RoleController extends Controller
                 'role' => [
                     'id' => $role->id,
                     'name' => $role->name,
+                    'description' => $role->description,
                     'guard_name' => $role->guard_name,
                     'permissions' => $role->permissions->pluck('name'),
                     'created_at' => $role->created_at,

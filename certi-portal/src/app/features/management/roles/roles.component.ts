@@ -25,6 +25,8 @@ export class RolesComponent implements OnInit {
   isLoading = signal(false);
   errorMessage = signal('');
   successMessage = signal('');
+  searchQuery = signal('');
+  selectAllPermissions = signal(false);
 
   // Modal states
   showCreateModal = signal(false);
@@ -34,14 +36,18 @@ export class RolesComponent implements OnInit {
 
   // Forms
   roleForm: FormGroup;
+  updateRoleForm: FormGroup;
 
-  constructor(
-    private http: HttpClient,
-    private fb: FormBuilder
-  ) {
+  constructor(private http: HttpClient, private fb: FormBuilder) {
     this.roleForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2)]],
-      guard_name: ['web', [Validators.required]],
+      description: ['', [Validators.required, Validators.minLength(5)]],
+      permissions: [[]]
+    });
+
+    this.updateRoleForm = this.fb.group({
+      name: ['', [Validators.required, Validators.minLength(2)]],
+      description: ['', [Validators.required, Validators.minLength(5)]],
       permissions: [[]]
     });
   }
@@ -122,18 +128,29 @@ export class RolesComponent implements OnInit {
         try {
           if (response.success) {
             // The backend returns permissions grouped by module
-            const groupedPermissions = response.data || {};
+            const groupedPermissions = response.data?.permissions_grouped || {};
 
-            // Flatten the grouped permissions into a single array
-            const allPermissions: Permission[] = [];
-            Object.values(groupedPermissions).forEach((modulePermissions: any) => {
-              if (Array.isArray(modulePermissions)) {
-                allPermissions.push(...modulePermissions);
-              }
-            });
+            // Verificar que groupedPermissions sea un objeto válido
+            if (typeof groupedPermissions === 'object' && groupedPermissions !== null) {
+              // Flatten the grouped permissions into a single array
+              const allPermissions: Permission[] = [];
+              Object.values(groupedPermissions).forEach((modulePermissions: any) => {
+                if (Array.isArray(modulePermissions)) {
+                  allPermissions.push(...modulePermissions);
+                }
+              });
 
-            this.permissions.set(allPermissions);
-            this.permissionsGrouped.set(groupedPermissions);
+              this.permissions.set(allPermissions);
+              this.permissionsGrouped.set(groupedPermissions);
+              
+              console.log('Permissions loaded successfully:', {
+                grouped: groupedPermissions,
+                total: allPermissions.length
+              });
+            } else {
+              console.error('Invalid permissions_grouped structure:', response.data);
+              this.errorMessage.set('Estructura de permisos inválida del servidor');
+            }
           } else {
             this.errorMessage.set(response.message || 'Error al cargar los permisos');
             console.error('API Error:', response);
@@ -171,19 +188,23 @@ export class RolesComponent implements OnInit {
     this.roleForm.reset();
     this.roleForm.patchValue({
       name: '',
-      guard_name: 'web',
+      description: '',
       permissions: []
     });
+    this.searchQuery.set('');
+    this.selectAllPermissions.set(false);
     this.showCreateModal.set(true);
   }
 
   openEditModal(role: Role): void {
     this.selectedRole.set(role);
-    this.roleForm.patchValue({
+    this.updateRoleForm.patchValue({
       name: role.name,
-      guard_name: role.guard_name || 'web',
+      description: role.description || '',
       permissions: role.permissions?.map(p => typeof p === 'string' ? p : p.name) || []
     });
+    this.searchQuery.set('');
+    this.selectAllPermissions.set(false);
     this.showEditModal.set(true);
   }
 
@@ -197,7 +218,18 @@ export class RolesComponent implements OnInit {
     this.showEditModal.set(false);
     this.showDeleteModal.set(false);
     this.selectedRole.set(null);
-    this.roleForm.reset();
+    this.searchQuery.set('');
+    this.selectAllPermissions.set(false);
+    this.roleForm.reset({
+      name: '',
+      description: '',
+      permissions: []
+    });
+    this.updateRoleForm.reset({
+      name: '',
+      description: '',
+      permissions: []
+    });
   }
 
   // CRUD operations
@@ -228,9 +260,9 @@ export class RolesComponent implements OnInit {
   }
 
   updateRole(): void {
-    if (this.roleForm.valid && this.selectedRole()) {
+    if (this.updateRoleForm.valid && this.selectedRole()) {
       this.isLoading.set(true);
-      const formData = this.roleForm.value;
+      const formData = this.updateRoleForm.value;
       const roleId = this.selectedRole()!.id;
 
       this.http.put<ApiResponse>(`${environment.apiUrl}/roles/${roleId}`, formData).subscribe({
@@ -280,8 +312,9 @@ export class RolesComponent implements OnInit {
     }
   }
 
-  getFieldError(fieldName: string): string {
-    const field = this.roleForm.get(fieldName);
+  getFieldError(fieldName: string, formType: 'create' | 'edit' = 'create'): string {
+    const form = formType === 'create' ? this.roleForm : this.updateRoleForm;
+    const field = form.get(fieldName);
     if (field?.errors && field.touched) {
       if (field.errors['required']) {
         return `${fieldName} es requerido`;
@@ -293,8 +326,10 @@ export class RolesComponent implements OnInit {
     return '';
   }
 
-  onPermissionChange(event: any, permissionName: string): void {
-    const permissions = this.roleForm.get('permissions')?.value || [];
+  onPermissionChange(event: any, permissionName: string, formType: 'create' | 'edit' = 'create'): void {
+    const form = formType === 'create' ? this.roleForm : this.updateRoleForm;
+    const permissions = form.get('permissions')?.value || [];
+    
     if (event.target.checked) {
       if (!permissions.includes(permissionName)) {
         permissions.push(permissionName);
@@ -305,7 +340,7 @@ export class RolesComponent implements OnInit {
         permissions.splice(index, 1);
       }
     }
-    this.roleForm.patchValue({ permissions });
+    form.patchValue({ permissions });
   }
 
   formatDate(dateString: string): string {
@@ -344,5 +379,76 @@ export class RolesComponent implements OnInit {
     // This is a simplified check. In a real app, you should use a proper auth service
     const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return user?.permissions?.includes(permission) || user?.is_admin === true;
+  }
+
+  // Filtrar permisos basado en la búsqueda
+  getFilteredPermissions(): Array<{key: string, value: Permission[]}> {
+    const query = this.searchQuery().toLowerCase();
+    const grouped = this.permissionsGrouped();
+    
+    // Verificar que grouped sea un objeto válido y no esté vacío
+    if (!grouped || typeof grouped !== 'object' || Object.keys(grouped).length === 0) {
+      return [];
+    }
+    
+    if (!query) {
+      return Object.entries(grouped).map(([key, value]) => ({ key, value }));
+    }
+
+    const filteredGroups: Array<{key: string, value: Permission[]}> = [];
+    
+    Object.entries(grouped).forEach(([group, permissions]) => {
+      // Verificar que permissions sea un array
+      if (!Array.isArray(permissions)) {
+        return;
+      }
+      
+      const filtered = permissions.filter(permission => 
+        permission.name.toLowerCase().includes(query) ||
+        group.toLowerCase().includes(query)
+      );
+      
+      if (filtered.length > 0) {
+        filteredGroups.push({ key: group, value: filtered });
+      }
+    });
+    
+    return filteredGroups;
+  }
+
+  // Seleccionar/deseleccionar todos los permisos
+  onSelectAllPermissions(event: any, formType: 'create' | 'edit' = 'create'): void {
+    const isChecked = event.target.checked;
+    this.selectAllPermissions.set(isChecked);
+    
+    const form = formType === 'create' ? this.roleForm : this.updateRoleForm;
+    const allPermissions = this.permissions();
+    
+    if (isChecked) {
+      // Seleccionar todos los permisos
+      const allPermissionNames = allPermissions.map(p => p.name);
+      form.patchValue({ permissions: allPermissionNames });
+    } else {
+      // Deseleccionar todos los permisos
+      form.patchValue({ permissions: [] });
+    }
+  }
+
+  // Verificar si todos los permisos están seleccionados
+  areAllPermissionsSelected(formType: 'create' | 'edit' = 'create'): boolean {
+    const form = formType === 'create' ? this.roleForm : this.updateRoleForm;
+    const selectedPermissions = form.get('permissions')?.value || [];
+    const allPermissions = this.permissions();
+    
+    return allPermissions.length > 0 && selectedPermissions.length === allPermissions.length;
+  }
+
+  // Verificar si algunos permisos están seleccionados (para estado indeterminado)
+  areSomePermissionsSelected(formType: 'create' | 'edit' = 'create'): boolean {
+    const form = formType === 'create' ? this.roleForm : this.updateRoleForm;
+    const selectedPermissions = form.get('permissions')?.value || [];
+    const allPermissions = this.permissions();
+    
+    return selectedPermissions.length > 0 && selectedPermissions.length < allPermissions.length;
   }
 }

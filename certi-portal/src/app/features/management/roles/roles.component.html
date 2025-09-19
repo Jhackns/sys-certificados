@@ -132,31 +132,60 @@
       </div>
 
       <div class="form-group">
-        <label for="guard_name">Guard</label>
-        <select
-          id="guard_name"
-          formControlName="guard_name"
+        <label for="description">Descripción</label>
+        <textarea
+          id="description"
+          formControlName="description"
           class="form-control"
-        >
-          <option value="web">Web</option>
-          <option value="api">API</option>
-        </select>
+          rows="3"
+          placeholder="Descripción del rol y sus responsabilidades"
+        ></textarea>
       </div>
 
       <div class="form-group">
         <label>Permisos</label>
+
+        <!-- Search and Select All Controls -->
+        <div class="permissions-controls">
+          <div class="search-container">
+            <input
+              type="text"
+              class="form-control search-input"
+              placeholder="Buscar permisos..."
+              [value]="searchQuery()"
+              (input)="searchQuery.set($any($event.target).value)"
+            />
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+          </div>
+
+          <div class="select-all-container">
+            <label class="checkbox-label select-all-label">
+              <input
+                type="checkbox"
+                [checked]="areAllPermissionsSelected('create')"
+                [indeterminate]="areSomePermissionsSelected('create')"
+                (change)="onSelectAllPermissions($event, 'create')"
+              />
+              <span>Seleccionar todos</span>
+            </label>
+          </div>
+        </div>
+
         <div class="permissions-container">
-          <div *ngFor="let group of getPermissionsGrouped()" class="permission-group">
+          <div *ngFor="let group of getFilteredPermissions()" class="permission-group">
             <h4 class="group-title">{{ group.key | titlecase }}</h4>
             <div class="checkbox-group">
               <label *ngFor="let permission of group.value" class="checkbox-label">
                 <input
                   type="checkbox"
                   [value]="permission.name"
-                  (change)="onPermissionChange($event, permission.name)"
+                  (change)="onPermissionChange($event, permission.name, 'create')"
                   [checked]="roleForm.get('permissions')?.value?.includes(permission.name)"
                 />
-                <span>{{ permission.action | titlecase }}</span>
+                <span>{{ permission.name | titlecase }}</span>
               </label>
             </div>
           </div>
@@ -181,7 +210,7 @@
       <button class="modal-close" (click)="closeModals()">&times;</button>
     </div>
 
-    <form [formGroup]="roleForm" (ngSubmit)="updateRole()" class="modal-form">
+    <form [formGroup]="updateRoleForm" (ngSubmit)="updateRole()" class="modal-form">
       <div class="form-group">
         <label for="edit-name">Nombre del Rol</label>
         <input
@@ -189,40 +218,69 @@
           id="edit-name"
           formControlName="name"
           class="form-control"
-          [class.error]="getFieldError('name')"
+          [class.error]="getFieldError('name', 'edit')"
           placeholder="ej: editor_contenido"
         />
-        <div class="error-message" *ngIf="getFieldError('name')">
-          {{ getFieldError('name') }}
+        <div class="error-message" *ngIf="getFieldError('name', 'edit')">
+          {{ getFieldError('name', 'edit') }}
         </div>
       </div>
 
       <div class="form-group">
-        <label for="edit-guard_name">Guard</label>
-        <select
-          id="edit-guard_name"
-          formControlName="guard_name"
+        <label for="edit-description">Descripción</label>
+        <textarea
+          id="edit-description"
+          formControlName="description"
           class="form-control"
-        >
-          <option value="web">Web</option>
-          <option value="api">API</option>
-        </select>
+          rows="3"
+          placeholder="Descripción del rol y sus responsabilidades"
+        ></textarea>
       </div>
 
       <div class="form-group">
         <label>Permisos</label>
+
+        <!-- Search and Select All Controls -->
+        <div class="permissions-controls">
+          <div class="search-container">
+            <input
+              type="text"
+              class="form-control search-input"
+              placeholder="Buscar permisos..."
+              [value]="searchQuery()"
+              (input)="searchQuery.set($event.target.value)"
+            />
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+          </div>
+
+          <div class="select-all-container">
+            <label class="checkbox-label select-all-label">
+              <input
+                type="checkbox"
+                [checked]="areAllPermissionsSelected('edit')"
+                [indeterminate]="areSomePermissionsSelected('edit')"
+                (change)="onSelectAllPermissions($event, 'edit')"
+              />
+              <span>Seleccionar todos</span>
+            </label>
+          </div>
+        </div>
+
         <div class="permissions-container">
-          <div *ngFor="let group of getPermissionsGrouped()" class="permission-group">
+          <div *ngFor="let group of getFilteredPermissions()" class="permission-group">
             <h4 class="group-title">{{ group.key | titlecase }}</h4>
             <div class="checkbox-group">
               <label *ngFor="let permission of group.value" class="checkbox-label">
                 <input
                   type="checkbox"
                   [value]="permission.name"
-                  (change)="onPermissionChange($event, permission.name)"
-                  [checked]="roleForm.get('permissions')?.value?.includes(permission.name)"
+                  (change)="onPermissionChange($event, permission.name, 'edit')"
+                  [checked]="updateRoleForm.get('permissions')?.value?.includes(permission.name)"
                 />
-                <span>{{ permission.action | titlecase }}</span>
+                <span>{{ permission.name | titlecase }}</span>
               </label>
             </div>
           </div>
@@ -231,7 +289,7 @@
 
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" (click)="closeModals()">Cancelar</button>
-        <button type="submit" class="btn btn-primary" [disabled]="roleForm.invalid || isLoading()">
+        <button type="submit" class="btn btn-primary" [disabled]="updateRoleForm.invalid || isLoading()">
           {{ isLoading() ? 'Actualizando...' : 'Actualizar Rol' }}
         </button>
       </div>
