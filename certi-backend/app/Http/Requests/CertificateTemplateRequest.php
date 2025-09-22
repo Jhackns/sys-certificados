@@ -21,14 +21,22 @@ class CertificateTemplateRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
-            'template_content' => 'required|string',
-            'template_styles' => 'nullable|string',
-            'company_id' => 'required|exists:companies,id',
-            'is_active' => 'sometimes|boolean',
+            'activity_type' => 'required|in:course,event,other',
+            'status' => 'required|in:active,inactive',
+            'template_file' => 'sometimes|file|mimes:jpg,jpeg,png,pdf|max:5120', // Permitir imágenes y aumentar tamaño
         ];
+
+        // Para actualizaciones, hacer todos los campos opcionales pero requeridos si se proporcionan
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['name'] = 'sometimes|required|string|max:255';
+            $rules['activity_type'] = 'sometimes|required|in:course,event,other';
+            $rules['status'] = 'sometimes|required|in:active,inactive';
+        }
+
+        return $rules;
     }
 
     /**
@@ -42,10 +50,12 @@ class CertificateTemplateRequest extends FormRequest
             'name.required' => 'El nombre de la plantilla es obligatorio.',
             'name.max' => 'El nombre de la plantilla no puede exceder 255 caracteres.',
             'description.max' => 'La descripción no puede exceder 1000 caracteres.',
-            'template_content.required' => 'El contenido de la plantilla es obligatorio.',
-            'company_id.required' => 'La empresa es obligatoria.',
-            'company_id.exists' => 'La empresa seleccionada no existe.',
+            'activity_type.in' => 'El tipo de actividad debe ser: course, event o other.',
+            'status.in' => 'El estado debe ser: active o inactive.',
             'is_active.boolean' => 'El estado debe ser verdadero o falso.',
+            'template_file.file' => 'Debe ser un archivo válido.',
+            'template_file.mimes' => 'El archivo debe ser de tipo: jpg, jpeg, png o pdf.',
+            'template_file.max' => 'El archivo no puede exceder 5MB.',
         ];
     }
 }

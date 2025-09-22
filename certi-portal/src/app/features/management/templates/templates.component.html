@@ -27,14 +27,14 @@
     <form [formGroup]="filterForm" class="filters-form">
       <div class="search-box">
         <i class="fas fa-search"></i>
-        <input 
-          type="text" 
-          class="form-control" 
-          placeholder="Buscar plantillas..." 
+        <input
+          type="text"
+          class="form-control"
+          placeholder="Buscar plantillas..."
           formControlName="search"
         >
       </div>
-      
+
       <div class="filter-group">
         <select class="form-control" formControlName="activity_type">
           <option value="">Todos los tipos</option>
@@ -42,19 +42,19 @@
             {{ type.label }}
           </option>
         </select>
-        
+
         <select class="form-control" formControlName="status">
           <option value="">Todos los estados</option>
           <option *ngFor="let status of statusOptions" [value]="status.value">
             {{ status.label }}
           </option>
         </select>
-        
+
         <button type="button" class="btn btn-primary" (click)="applyFilters()">
           <i class="fas fa-filter"></i>
           Filtrar
         </button>
-        
+
         <button type="button" class="btn btn-secondary" (click)="clearFilters()">
           <i class="fas fa-times"></i>
           Limpiar
@@ -65,107 +65,139 @@
 
   <!-- Tabla de plantillas -->
   <div class="table-container">
-    <table class="templates-table">
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>Tipo de Actividad</th>
-          <th>Estado</th>
-          <th>Fecha de Creación</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngIf="isLoading()">
-          <td colspan="5" class="loading-row">
-            <div class="loading-spinner">
-              <i class="fas fa-spinner fa-spin"></i>
-              Cargando plantillas...
-            </div>
-          </td>
-        </tr>
-        
-        <tr *ngIf="!isLoading() && filteredTemplates().length === 0">
-          <td colspan="5" class="empty-row">
-            <div class="empty-state">
-              <i class="fas fa-file-alt"></i>
-              <p>No se encontraron plantillas</p>
-            </div>
-          </td>
-        </tr>
-        
-        <tr *ngFor="let template of filteredTemplates()" class="template-row">
-          <td>
-            <div class="template-info">
-              <strong>{{ template.name }}</strong>
-              <small *ngIf="template.description">{{ template.description }}</small>
-            </div>
-          </td>
-          <td>
-            <span class="type-badge" [class]="template.activity_type">
-              {{ getActivityTypeLabel(template.activity_type) }}
-            </span>
-          </td>
-          <td>
-            <span class="badge" [class]="template.status">
-              {{ getStatusLabel(template.status) }}
-            </span>
-          </td>
-          <td>{{ template.created_at | date:'dd/MM/yyyy' }}</td>
-          <td>
-            <div class="action-buttons">
-              <button 
-                class="btn-icon btn-view" 
-                (click)="openViewModal(template)"
-                title="Ver detalles"
-              >
-                <i class="fas fa-eye"></i>
-              </button>
-              <button 
-                class="btn-icon btn-edit" 
-                (click)="openEditModal(template)"
-                title="Editar"
-              >
-                <i class="fas fa-edit"></i>
-              </button>
-              <button 
-                class="btn-icon btn-toggle" 
-                (click)="toggleTemplateStatus(template)"
-                [title]="template.status === 'active' ? 'Desactivar' : 'Activar'"
-              >
-                <i class="fas" [class]="template.status === 'active' ? 'fa-eye-slash' : 'fa-eye'"></i>
-              </button>
-              <button 
-                class="btn-icon btn-delete" 
-                (click)="openDeleteModal(template)"
-                title="Eliminar"
-              >
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Loading State -->
+    <div *ngIf="isLoading()" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Cargando plantillas...</p>
+    </div>
+
+    <!-- Error State -->
+    <div *ngIf="errorMessage() && !isLoading()" class="error-state">
+      <div class="error-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <h3>Error al cargar plantillas</h3>
+      <p>{{ errorMessage() }}</p>
+      <button class="btn btn-primary" (click)="loadTemplates()">Reintentar</button>
+    </div>
+
+    <!-- Templates Table -->
+    <div *ngIf="!isLoading() && !errorMessage()" class="templates-content">
+      <table class="templates-table">
+        <thead>
+          <tr>
+            <th>Vista Previa</th>
+            <th>Nombre</th>
+            <th>Tipo de Actividad</th>
+            <th>Estado</th>
+            <th>Fecha de Creación</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="filteredTemplates().length === 0">
+            <td colspan="6" class="empty-row">
+              <div class="empty-state">
+                <i class="fas fa-file-alt"></i>
+                <p>No se encontraron plantillas</p>
+              </div>
+            </td>
+          </tr>
+
+          <tr *ngFor="let template of filteredTemplates()" class="template-row">
+            <td>
+              <div class="template-preview">
+                <img
+                  *ngIf="template.file_url"
+                  [src]="template.file_url"
+                  [alt]="template.name"
+                  class="preview-thumbnail"
+                  (click)="openImageModal(template.file_url, template.name)"
+                  title="Click para ver en grande"
+                >
+                <div *ngIf="!template.file_url" class="no-preview">
+                  <i class="fas fa-image"></i>
+                  <span>Sin imagen</span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="template-info">
+                <strong>{{ template.name }}</strong>
+                <small *ngIf="template.description">{{ template.description }}</small>
+              </div>
+            </td>
+            <td>
+              <span class="type-badge" [class]="getActivityTypeBadgeClass(template.activity_type)">
+                {{ getActivityTypeLabel(template.activity_type) }}
+              </span>
+            </td>
+            <td>
+              <span class="badge" [class]="getStatusBadgeClass(template.status)">
+                {{ getStatusLabel(template.status) }}
+              </span>
+            </td>
+            <td>{{ template.created_at | date:'dd/MM/yyyy' }}</td>
+            <td>
+              <div class="action-buttons">
+                <button
+                  class="btn-icon btn-view"
+                  (click)="openViewModal(template)"
+                  title="Ver detalles"
+                >
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button
+                  class="btn-icon btn-edit"
+                  (click)="openEditModal(template)"
+                  title="Editar"
+                >
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button
+                  class="btn-icon btn-toggle"
+                  (click)="toggleTemplateStatus(template)"
+                  [title]="template.status === 'active' ? 'Desactivar' : 'Activar'"
+                  [class]="template.status === 'active' ? 'btn-deactivate' : 'btn-activate'"
+                >
+                  <i class="fas" [class]="template.status === 'active' ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
+                </button>
+                <button
+                  class="btn-icon btn-delete"
+                  (click)="openDeleteModal(template)"
+                  title="Eliminar"
+                >
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <!-- Paginación -->
-  <div class="pagination-container" *ngIf="totalPages() > 1">
+  <div class="pagination-container" *ngIf="totalPages() > 1 && !isLoading() && !errorMessage()">
     <div class="pagination-info">
-      Mostrando {{ (currentPage() - 1) * perPage() + 1 }} - 
+      Mostrando {{ (currentPage() - 1) * perPage() + 1 }} -
       {{ Math.min(currentPage() * perPage(), totalItems()) }} de {{ totalItems() }} plantillas
     </div>
-    
+
     <nav class="pagination">
-      <button 
-        class="page-link" 
+      <button
+        class="page-link"
         [disabled]="currentPage() === 1"
         (click)="goToPage(currentPage() - 1)"
       >
         <i class="fas fa-chevron-left"></i>
       </button>
-      
-      <button 
+
+      <button
         *ngFor="let page of [].constructor(totalPages()); let i = index"
         class="page-link"
         [class.active]="currentPage() === i + 1"
@@ -173,15 +205,41 @@
       >
         {{ i + 1 }}
       </button>
-      
-      <button 
-        class="page-link" 
+
+      <button
+        class="page-link"
         [disabled]="currentPage() === totalPages()"
         (click)="goToPage(currentPage() + 1)"
       >
         <i class="fas fa-chevron-right"></i>
       </button>
     </nav>
+  </div>
+</div>
+
+<!-- Modal para mostrar imagen en grande -->
+<div class="modal-overlay" *ngIf="showImageModal()" (click)="closeImageModal()">
+  <div class="modal-dialog modal-image" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ imageModalTitle() }}</h3>
+      <button class="btn-close" (click)="closeImageModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="modal-body modal-image-body">
+      <img
+        [src]="imageModalUrl()"
+        [alt]="imageModalTitle()"
+        class="full-size-image"
+      >
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeImageModal()">
+        Cerrar
+      </button>
+    </div>
   </div>
 </div>
 
@@ -194,14 +252,14 @@
         <i class="fas fa-times"></i>
       </button>
     </div>
-    
+
     <form [formGroup]="templateForm" (ngSubmit)="createTemplate()">
       <div class="modal-body">
         <div class="form-group">
           <label>Nombre *</label>
-          <input 
-            class="form-control" 
-            type="text" 
+          <input
+            class="form-control"
+            type="text"
             formControlName="name"
             placeholder="Nombre de la plantilla"
           >
@@ -210,17 +268,17 @@
             <span *ngIf="templateForm.get('name')?.errors?.['minlength']">El nombre debe tener al menos 3 caracteres</span>
           </div>
         </div>
-        
+
         <div class="form-group">
           <label>Descripción</label>
-          <textarea 
-            class="form-control" 
+          <textarea
+            class="form-control"
             formControlName="description"
             placeholder="Descripción de la plantilla"
             rows="3"
           ></textarea>
         </div>
-        
+
         <div class="form-group">
           <label>Tipo de Actividad *</label>
           <select class="form-control" formControlName="activity_type">
@@ -229,7 +287,7 @@
             </option>
           </select>
         </div>
-        
+
         <div class="form-group">
           <label>Estado *</label>
           <select class="form-control" formControlName="status">
@@ -238,15 +296,58 @@
             </option>
           </select>
         </div>
+
+        <div class="form-group">
+          <label>Imagen de Plantilla</label>
+          <div class="file-upload-container">
+            <input
+              type="file"
+              #fileInputCreate
+              accept="image/*"
+              (change)="onFileSelected($event)"
+              class="file-input"
+              id="template-file-create"
+            >
+            <label for="template-file-create" class="file-upload-label">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>{{ selectedFile() ? selectedFile()!.name : 'Seleccionar imagen de plantilla' }}</span>
+            </label>
+            <div class="file-info" *ngIf="selectedFile()">
+              <small class="text-muted">
+                Tamaño: {{ formatFileSize(selectedFile()!.size) }}
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vista previa de la imagen nueva -->
+        <div class="form-group" *ngIf="imagePreview()">
+          <label>Vista Previa</label>
+          <div class="image-preview-container">
+            <img
+              [src]="imagePreview()"
+              alt="Vista previa"
+              class="template-preview-image"
+            >
+            <button
+              type="button"
+              class="btn-remove-image"
+              (click)="removeImage()"
+              title="Remover imagen"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
       </div>
-      
+
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" (click)="closeModals()">
           Cancelar
         </button>
-        <button 
-          type="submit" 
-          class="btn btn-primary" 
+        <button
+          type="submit"
+          class="btn btn-primary"
           [disabled]="templateForm.invalid || isLoading()"
         >
           <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
@@ -266,14 +367,14 @@
         <i class="fas fa-times"></i>
       </button>
     </div>
-    
+
     <form [formGroup]="templateForm" (ngSubmit)="updateTemplate()">
       <div class="modal-body">
         <div class="form-group">
           <label>Nombre *</label>
-          <input 
-            class="form-control" 
-            type="text" 
+          <input
+            class="form-control"
+            type="text"
             formControlName="name"
             placeholder="Nombre de la plantilla"
           >
@@ -282,17 +383,17 @@
             <span *ngIf="templateForm.get('name')?.errors?.['minlength']">El nombre debe tener al menos 3 caracteres</span>
           </div>
         </div>
-        
+
         <div class="form-group">
           <label>Descripción</label>
-          <textarea 
-            class="form-control" 
+          <textarea
+            class="form-control"
             formControlName="description"
             placeholder="Descripción de la plantilla"
             rows="3"
           ></textarea>
         </div>
-        
+
         <div class="form-group">
           <label>Tipo de Actividad *</label>
           <select class="form-control" formControlName="activity_type">
@@ -301,7 +402,7 @@
             </option>
           </select>
         </div>
-        
+
         <div class="form-group">
           <label>Estado *</label>
           <select class="form-control" formControlName="status">
@@ -310,15 +411,59 @@
             </option>
           </select>
         </div>
+
+        <div class="form-group">
+          <label>Cambiar Imagen de Plantilla</label>
+          <div class="file-upload-container">
+            <input
+              type="file"
+              #fileInputEdit
+              accept="image/*"
+              (change)="onFileSelected($event)"
+              class="file-input"
+              id="template-file-edit"
+            >
+            <label for="template-file-edit" class="file-upload-label">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>{{ selectedFile() ? selectedFile()!.name : 'Seleccionar nueva imagen de plantilla' }}</span>
+            </label>
+            <div class="file-info" *ngIf="selectedFile()">
+              <small class="text-muted">
+                Tamaño: {{ formatFileSize(selectedFile()!.size) }}
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vista previa de la imagen actual o nueva -->
+        <div class="form-group" *ngIf="imagePreview() || selectedTemplate()?.file_url">
+          <label>Vista Previa</label>
+          <div class="image-preview-container">
+            <img
+              [src]="imagePreview() || selectedTemplate()?.file_url"
+              alt="Vista previa"
+              class="template-preview-image"
+            >
+            <button
+              type="button"
+              class="btn-remove-image"
+              (click)="removeImage()"
+              title="Remover imagen"
+              *ngIf="imagePreview()"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
       </div>
-      
+
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" (click)="closeModals()">
           Cancelar
         </button>
-        <button 
-          type="submit" 
-          class="btn btn-primary" 
+        <button
+          type="submit"
+          class="btn btn-primary"
           [disabled]="templateForm.invalid || isLoading()"
         >
           <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
@@ -338,19 +483,22 @@
         <i class="fas fa-times"></i>
       </button>
     </div>
-    
+
     <div class="modal-body">
-      <p>¿Estás seguro de que deseas eliminar la plantilla <strong>{{ selectedTemplate()?.name }}</strong>?</p>
-      <p class="text-danger">Esta acción no se puede deshacer.</p>
+      <div class="confirm-delete">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>¿Estás seguro de que deseas eliminar la plantilla <strong>{{ selectedTemplate()?.name }}</strong>?</p>
+        <p class="warning">Esta acción no se puede deshacer.</p>
+      </div>
     </div>
-    
+
     <div class="modal-footer">
       <button type="button" class="btn btn-secondary" (click)="closeModals()">
         Cancelar
       </button>
-      <button 
-        type="button" 
-        class="btn btn-danger" 
+      <button
+        type="button"
+        class="btn btn-danger"
         (click)="deleteTemplate()"
         [disabled]="isLoading()"
       >
@@ -370,56 +518,99 @@
         <i class="fas fa-times"></i>
       </button>
     </div>
-    
+
     <div class="modal-body" *ngIf="selectedTemplate()">
-      <div class="template-details">
-        <div class="detail-row">
-          <strong>Nombre:</strong>
-          <span>{{ selectedTemplate()?.name }}</span>
+      <div class="template-details-enhanced">
+        <!-- Header con información principal -->
+        <div class="detail-header">
+          <div class="template-icon">
+            <i class="fas fa-file-alt"></i>
+          </div>
+          <div class="template-info">
+            <h3>{{ selectedTemplate()?.name }}</h3>
+            <div class="template-meta">
+              <span class="badge" [class]="getStatusBadgeClass(selectedTemplate()?.status || '')">
+                <i class="fas" [class]="selectedTemplate()?.status === 'active' ? 'fa-check-circle' : 'fa-times-circle'"></i>
+                {{ getStatusLabel(selectedTemplate()?.status || '') }}
+              </span>
+              <span class="type-badge" [class]="getActivityTypeBadgeClass(selectedTemplate()?.activity_type || '')">
+                <i class="fas fa-tag"></i>
+                {{ getActivityTypeLabel(selectedTemplate()?.activity_type || '') }}
+              </span>
+            </div>
+          </div>
         </div>
-        
-        <div class="detail-row" *ngIf="selectedTemplate()?.description">
-          <strong>Descripción:</strong>
-          <span>{{ selectedTemplate()?.description }}</span>
-        </div>
-        
-        <div class="detail-row">
-          <strong>Tipo de Actividad:</strong>
-          <span class="type-badge" [class]="selectedTemplate()?.activity_type">
-            {{ getActivityTypeLabel(selectedTemplate()?.activity_type || '') }}
-          </span>
-        </div>
-        
-        <div class="detail-row">
-          <strong>Estado:</strong>
-          <span class="badge" [class]="selectedTemplate()?.status">
-            {{ getStatusLabel(selectedTemplate()?.status || '') }}
-          </span>
-        </div>
-        
-        <div class="detail-row">
-          <strong>Fecha de Creación:</strong>
-          <span>{{ selectedTemplate()?.created_at | date:'dd/MM/yyyy HH:mm' }}</span>
-        </div>
-        
-        <div class="detail-row">
-          <strong>Última Actualización:</strong>
-          <span>{{ selectedTemplate()?.updated_at | date:'dd/MM/yyyy HH:mm' }}</span>
+
+        <!-- Información detallada -->
+        <div class="detail-sections">
+          <div class="detail-section">
+            <h4><i class="fas fa-info-circle"></i> Información General</h4>
+            <div class="detail-grid">
+              <div class="detail-item" *ngIf="selectedTemplate()?.description">
+                <label>Descripción:</label>
+                <p>{{ selectedTemplate()?.description }}</p>
+              </div>
+              <div class="detail-item">
+                <label>Fecha de Creación:</label>
+                <p><i class="fas fa-calendar-plus"></i> {{ selectedTemplate()?.created_at | date:'dd/MM/yyyy HH:mm' }}</p>
+              </div>
+              <div class="detail-item">
+                <label>Última Actualización:</label>
+                <p><i class="fas fa-clock"></i> {{ selectedTemplate()?.updated_at | date:'dd/MM/yyyy HH:mm' }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista previa mejorada -->
+          <div class="detail-section" *ngIf="selectedTemplate()?.file_url">
+            <h4><i class="fas fa-image"></i> Vista Previa</h4>
+            <div class="enhanced-preview-container">
+              <div class="preview-wrapper">
+                <img
+                  [src]="selectedTemplate()?.file_url"
+                  [alt]="selectedTemplate()?.name"
+                  class="enhanced-preview-image"
+                  (click)="openImageModal(selectedTemplate()?.file_url || '', selectedTemplate()?.name || '')"
+                  title="Click para ver en grande"
+                >
+                <div class="preview-overlay">
+                  <i class="fas fa-search-plus"></i>
+                  <span>Click para ampliar</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Estadísticas -->
+          <div class="detail-section">
+            <h4><i class="fas fa-chart-bar"></i> Estadísticas</h4>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-value">{{ selectedTemplate()?.certificates_count || 0 }}</div>
+                <div class="stat-label">Certificados Generados</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ selectedTemplate()?.activity_type || 'N/A' }}</div>
+                <div class="stat-label">Tipo de Actividad</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    
-    <div class="modal-footer">
+
+    <div class="modal-footer enhanced-footer">
       <button type="button" class="btn btn-secondary" (click)="closeModals()">
+        <i class="fas fa-times"></i>
         Cerrar
       </button>
-      <button 
-        type="button" 
-        class="btn btn-primary" 
+      <button
+        type="button"
+        class="btn btn-primary"
         (click)="openEditModal(selectedTemplate()!)"
       >
         <i class="fas fa-edit"></i>
-        Editar
+        Editar Plantilla
       </button>
     </div>
   </div>

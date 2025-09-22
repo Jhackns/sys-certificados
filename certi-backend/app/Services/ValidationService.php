@@ -18,7 +18,7 @@ class ValidationService
      */
     public function getAll(int $perPage = 15)
     {
-        return Validation::with(['certificate.activity.company'])
+        return Validation::with(['certificate.activity'])
             ->orderBy('validated_at', 'desc')
             ->paginate($perPage);
     }
@@ -31,7 +31,7 @@ class ValidationService
      */
     public function getById(int $id): ?Validation
     {
-        return Validation::with(['certificate.activity.company'])->find($id);
+        return Validation::with(['certificate.activity'])->find($id);
     }
 
     /**
@@ -69,8 +69,8 @@ class ValidationService
     {
         return DB::transaction(function () use ($certificateCode, $validatorData) {
             // Buscar el certificado
-            $certificate = Certificate::with(['activity.company', 'template'])
-                ->where('certificate_code', $certificateCode)
+            $certificate = Certificate::with(['activity', 'template'])
+                ->where('unique_code', $certificateCode)
                 ->first();
 
             if (!$certificate) {
@@ -147,11 +147,11 @@ class ValidationService
      */
     public function search(array $criteria, int $perPage = 15)
     {
-        $query = Validation::with(['certificate.activity.company']);
+        $query = Validation::with(['certificate.activity']);
 
         if (isset($criteria['certificate_code'])) {
             $query->whereHas('certificate', function ($q) use ($criteria) {
-                $q->where('certificate_code', 'like', "%{$criteria['certificate_code']}%");
+                $q->where('unique_code', 'like', "%{$criteria['certificate_code']}%");
             });
         }
 
@@ -171,12 +171,6 @@ class ValidationService
             $query->where('validated_at', '<=', $criteria['date_to']);
         }
 
-        if (isset($criteria['company_id'])) {
-            $query->whereHas('certificate.activity', function ($q) use ($criteria) {
-                $q->where('company_id', $criteria['company_id']);
-            });
-        }
-
         return $query->orderBy('validated_at', 'desc')->paginate($perPage);
     }
 
@@ -189,12 +183,6 @@ class ValidationService
     public function getStatistics(array $filters = []): array
     {
         $query = Validation::query();
-
-        if (isset($filters['company_id'])) {
-            $query->whereHas('certificate.activity', function ($q) use ($filters) {
-                $q->where('company_id', $filters['company_id']);
-            });
-        }
 
         if (isset($filters['date_from'])) {
             $query->where('validated_at', '>=', $filters['date_from']);
@@ -249,7 +237,7 @@ class ValidationService
      */
     public function getByCode(string $code): ?Validation
     {
-        return Validation::with(['certificate.activity.company'])
+        return Validation::with(['certificate.activity'])
             ->where('validation_code', $code)
             ->first();
     }

@@ -306,8 +306,8 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // Crear 2 plantillas de ejemplo
-        CertificateTemplate::factory(2)->create();
+        // No crear plantillas por defecto - se crearán manualmente desde la interfaz
+        // CertificateTemplate::factory(2)->create();
 
         $this->command->info('  × Datos maestros creados correctamente');
     }

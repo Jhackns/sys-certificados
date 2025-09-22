@@ -131,12 +131,12 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // === GESTIÓN DE PLANTILLAS DE CERTIFICADOS ===
-    Route::prefix('certificate-templates')->middleware('permission:templates.read')->group(function () {
-        Route::get('/', [CertificateTemplateController::class, 'index']);
-        Route::get('/list', [CertificateTemplateController::class, 'list']); // Para dropdowns
-        Route::get('/{id}', [CertificateTemplateController::class, 'show']);
-        Route::get('/{id}/preview', [CertificateTemplateController::class, 'preview']); // Para vista previa
-        Route::post('/', [CertificateTemplateController::class, 'store'])->middleware('permission:templates.create');
+    Route::prefix('certificate-templates')->group(function () {
+        Route::get('/', [CertificateTemplateController::class, 'index'])->middleware('permission:templates.read');
+        Route::get('/list', [CertificateTemplateController::class, 'list'])->middleware('permission:templates.read'); // Para dropdowns
+        Route::get('/{id}', [CertificateTemplateController::class, 'show'])->middleware('permission:templates.read');
+        Route::get('/{id}/preview', [CertificateTemplateController::class, 'preview'])->middleware('permission:templates.read'); // Para vista previa
+        Route::post('/', [CertificateTemplateController::class, 'store']); // Temporalmente sin middleware
         Route::put('/{id}', [CertificateTemplateController::class, 'update'])->middleware('permission:templates.update');
         Route::delete('/{id}', [CertificateTemplateController::class, 'destroy'])->middleware('permission:templates.delete');
 
@@ -157,6 +157,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{id}/change-status', [CertificateController::class, 'changeStatus'])->middleware('permission:certificates.issue');
         Route::post('/{id}/generate-document', [CertificateController::class, 'generateDocument'])->middleware('permission:documents.upload');
         Route::get('/{id}/download', [CertificateController::class, 'download'])->middleware('permission:certificates.download');
+        Route::get('/{id}/preview', [CertificateController::class, 'preview'])->middleware('permission:certificates.read');
         Route::post('/{id}/send-email', [CertificateController::class, 'sendEmail'])->middleware('permission:emails.send');
 
         // Estadísticas y reportes

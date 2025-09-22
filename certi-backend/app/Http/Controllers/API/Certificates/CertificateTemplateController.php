@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CertificateTemplateRequest;
 use App\Models\CertificateTemplate;
 use App\Services\CertificateTemplateService;
+use App\Services\CertificateFileService;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,10 +19,12 @@ class CertificateTemplateController extends Controller
     use ApiResponseTrait;
 
     protected $templateService;
+    protected $fileService;
 
-    public function __construct(CertificateTemplateService $templateService)
+    public function __construct(CertificateTemplateService $templateService, CertificateFileService $fileService)
     {
         $this->templateService = $templateService;
+        $this->fileService = $fileService;
     }
 
     /**
@@ -56,20 +59,17 @@ class CertificateTemplateController extends Controller
     public function preview(int $id): JsonResponse
     {
         try {
-            $template = CertificateTemplate::with(['company'])->findOrFail($id);
+            $template = CertificateTemplate::with(['certificates'])->findOrFail($id);
 
             return $this->successResponse([
                 'template' => [
                     'id' => $template->id,
                     'name' => $template->name,
                     'description' => $template->description,
+                    'file_path' => $template->file_path,
+                    'file_url' => $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null,
                     'html_content' => $template->html_content,
-                    'css_styles' => $template->css_styles,
-                    'company' => $template->company ? [
-                        'id' => $template->company->id,
-                        'name' => $template->company->name,
-                        'logo_url' => $template->company->logo_url,
-                    ] : null,
+                    'css_styles' => $template->template_styles,
                 ]
             ], 'Vista previa de plantilla obtenida correctamente');
         } catch (\Exception $e) {
@@ -90,8 +90,8 @@ class CertificateTemplateController extends Controller
             $perPage = $request->query('per_page', 15);
 
             // Si hay criterios de búsqueda, usar el método search
-            if ($request->hasAny(['search', 'company_id', 'is_active'])) {
-                $criteria = $request->only(['search', 'company_id', 'is_active']);
+            if ($request->hasAny(['search', 'activity_type', 'status', 'is_active'])) {
+                $criteria = $request->only(['search', 'activity_type', 'status', 'is_active']);
                 $templates = $this->templateService->search($criteria, $perPage);
             } else {
                 $templates = $this->templateService->getAll($perPage);
@@ -103,14 +103,12 @@ class CertificateTemplateController extends Controller
                         'id' => $template->id,
                         'name' => $template->name,
                         'description' => $template->description,
+                        'file_path' => $template->file_path,
+                        'file_url' => $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null,
+                        'activity_type' => $template->activity_type,
+                        'status' => $template->status,
                         'is_active' => $template->is_active,
-                        'company_id' => $template->company_id,
                         'certificates_count' => $template->certificates_count,
-                        'company' => $template->company ? [
-                            'id' => $template->company->id,
-                            'name' => $template->company->name,
-                            'ruc' => $template->company->ruc,
-                        ] : null,
                         'created_at' => $template->created_at,
                         'updated_at' => $template->updated_at,
                     ];
@@ -137,7 +135,19 @@ class CertificateTemplateController extends Controller
     public function store(CertificateTemplateRequest $request): JsonResponse
     {
         try {
+            // Log para debugging
+            Log::info('Request data received:', $request->all());
+            Log::info('Request files:', $request->allFiles());
+            
             $data = $request->validated();
+
+            // Manejar la subida de archivo si existe
+            if ($request->hasFile('template_file')) {
+                $file = $request->file('template_file');
+                $templateName = $data['name'] ?? 'template';
+                $filePath = $this->fileService->uploadGlobalTemplate($file, $templateName);
+                $data['file_path'] = $filePath;
+            }
 
             // Crear la plantilla
             $template = $this->templateService->create($data);
@@ -156,10 +166,11 @@ class CertificateTemplateController extends Controller
                     'id' => $template->id,
                     'name' => $template->name,
                     'description' => $template->description,
+                    'file_path' => $template->file_path,
+                    'file_url' => $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null,
                     'template_content' => $template->template_content,
                     'template_styles' => $template->template_styles,
                     'is_active' => $template->is_active,
-                    'company_id' => $template->company_id,
                     'created_at' => $template->created_at,
                     'updated_at' => $template->updated_at,
                 ]
@@ -198,17 +209,11 @@ class CertificateTemplateController extends Controller
                     'template_content' => $template->template_content,
                     'template_styles' => $template->template_styles,
                     'is_active' => $template->is_active,
-                    'company_id' => $template->company_id,
                     'certificates_count' => $template->certificates_count,
-                    'company' => $template->company ? [
-                        'id' => $template->company->id,
-                        'name' => $template->company->name,
-                        'ruc' => $template->company->ruc,
-                    ] : null,
                     'certificates' => $template->certificates->map(function ($certificate) {
                         return [
                             'id' => $certificate->id,
-                            'certificate_code' => $certificate->certificate_code,
+                            'certificate_code' => $certificate->unique_code,
                             'participant_name' => $certificate->participant_name,
                             'participant_email' => $certificate->participant_email,
                             'status' => $certificate->status,
@@ -241,24 +246,64 @@ class CertificateTemplateController extends Controller
                 return $this->notFoundResponse('Plantilla no encontrada');
             }
 
+            // Log para debugging - INICIO DE PETICIÓN
+            Log::info('=== INICIO UPDATE TEMPLATE ===');
+            Log::info('Template ID:', ['id' => $id]);
+            Log::info('Template encontrada:', [
+                'id' => $template->id,
+                'name' => $template->name,
+                'description' => $template->description,
+                'activity_type' => $template->activity_type,
+                'status' => $template->status
+            ]);
+            Log::info('Update request data:', $request->all());
+            Log::info('Update request files:', $request->allFiles());
+
             $data = $request->validated();
+            Log::info('Validated data for update:', $data);
+
+            // Manejar la subida de archivo si existe
+            if ($request->hasFile('template_file')) {
+                $file = $request->file('template_file');
+                $templateName = $data['name'] ?? $template->name ?? 'template';
+                $filePath = $this->fileService->uploadGlobalTemplate($file, $templateName);
+                $data['file_path'] = $filePath;
+                Log::info('Archivo subido:', ['file_path' => $filePath]);
+            }
+
+            Log::info('Datos antes de actualizar:', $data);
             $updatedTemplate = $this->templateService->update($template, $data);
+            Log::info('Template actualizada en servicio');
+
+            // Verificar que los datos se guardaron
+            $freshTemplate = CertificateTemplate::find($id);
+            Log::info('Template después de actualizar (fresh):', [
+                'id' => $freshTemplate->id,
+                'name' => $freshTemplate->name,
+                'description' => $freshTemplate->description,
+                'activity_type' => $freshTemplate->activity_type,
+                'status' => $freshTemplate->status
+            ]);
 
             return $this->successResponse([
                 'template' => [
                     'id' => $updatedTemplate->id,
                     'name' => $updatedTemplate->name,
                     'description' => $updatedTemplate->description,
+                    'file_path' => $updatedTemplate->file_path,
+                    'file_url' => $updatedTemplate->file_path ? $this->fileService->getPublicUrl($updatedTemplate->file_path) : null,
                     'template_content' => $updatedTemplate->template_content,
                     'template_styles' => $updatedTemplate->template_styles,
+                    'activity_type' => $updatedTemplate->activity_type,
+                    'status' => $updatedTemplate->status,
                     'is_active' => $updatedTemplate->is_active,
-                    'company_id' => $updatedTemplate->company_id,
                     'created_at' => $updatedTemplate->created_at,
                     'updated_at' => $updatedTemplate->updated_at,
                 ]
             ], 'Plantilla actualizada exitosamente');
         } catch (\Exception $e) {
             Log::error('Error al actualizar plantilla: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
             return $this->errorResponse('Error al actualizar plantilla: ' . $e->getMessage(), 500);
         }
     }
@@ -305,7 +350,8 @@ class CertificateTemplateController extends Controller
                 return $this->notFoundResponse('Plantilla no encontrada');
             }
 
-            $status = $request->input('is_active', !$template->is_active);
+            $currentStatus = $template->status === 'active';
+            $status = $request->input('status') === 'active' ? true : !$currentStatus;
             $updatedTemplate = $this->templateService->toggleStatus($template, $status);
 
             $message = $status ? 'Plantilla activada exitosamente' : 'Plantilla desactivada exitosamente';
@@ -314,7 +360,7 @@ class CertificateTemplateController extends Controller
                 'template' => [
                     'id' => $updatedTemplate->id,
                     'name' => $updatedTemplate->name,
-                    'is_active' => $updatedTemplate->is_active,
+                    'status' => $updatedTemplate->status,
                 ]
             ], $message);
         } catch (\Exception $e) {

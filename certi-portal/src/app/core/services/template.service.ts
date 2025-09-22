@@ -8,10 +8,12 @@ export interface Template {
   name: string;
   description?: string;
   file_path?: string;
+  file_url?: string;
   activity_type: 'course' | 'event' | 'other';
   status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
+  certificates_count?: number;
 }
 
 export interface TemplateFilters {
@@ -48,7 +50,7 @@ export class TemplateService {
 
   getTemplates(filters: TemplateFilters = {}): Observable<ApiResponse<PaginatedResponse<Template>>> {
     let params = new HttpParams();
-    
+
     if (filters.search) params = params.set('search', filters.search);
     if (filters.activity_type) params = params.set('activity_type', filters.activity_type);
     if (filters.status) params = params.set('status', filters.status);
@@ -62,11 +64,11 @@ export class TemplateService {
     return this.http.get<ApiResponse<{ template: Template }>>(`${this.apiUrl}/${id}`);
   }
 
-  createTemplate(data: Partial<Template>): Observable<ApiResponse<{ template: Template }>> {
+  createTemplate(data: FormData | Partial<Template>): Observable<ApiResponse<{ template: Template }>> {
     return this.http.post<ApiResponse<{ template: Template }>>(this.apiUrl, data);
   }
 
-  updateTemplate(id: number, data: Partial<Template>): Observable<ApiResponse<{ template: Template }>> {
+  updateTemplate(id: number, data: FormData | Partial<Template>): Observable<ApiResponse<{ template: Template }>> {
     return this.http.put<ApiResponse<{ template: Template }>>(`${this.apiUrl}/${id}`, data);
   }
 

@@ -30,7 +30,7 @@ class CertificateRequest extends FormRequest
             'fecha_emision' => 'required|date',
             'fecha_vencimiento' => 'nullable|date|after:fecha_emision',
             'signed_by' => 'nullable|exists:users,id',
-            'status' => 'sometimes|in:active,revoked,expired',
+            'status' => 'sometimes|in:active,revoked,expired,issued,pending,cancelled',
         ];
     }
 
@@ -56,7 +56,7 @@ class CertificateRequest extends FormRequest
             'fecha_vencimiento.date' => 'La fecha de vencimiento debe ser una fecha válida.',
             'fecha_vencimiento.after' => 'La fecha de vencimiento debe ser posterior a la fecha de emisión.',
             'signed_by.exists' => 'El firmante seleccionado no existe.',
-            'status.in' => 'El estado debe ser: active, revoked o expired.',
+            'status.in' => 'El estado debe ser: active, revoked, expired, issued, pending o cancelled.',
         ];
     }
 }

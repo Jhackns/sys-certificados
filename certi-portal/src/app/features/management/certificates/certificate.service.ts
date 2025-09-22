@@ -39,6 +39,11 @@ export class CertificateService {
     return this.http.get(`${this.apiUrl}/${id}/download`, { responseType: 'blob' });
   }
 
+  // Nuevo método para descargar en formato específico
+  downloadCertificateFormat(id: number, format: 'pdf' | 'jpg'): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${id}/download?format=${format}`, { responseType: 'blob' });
+  }
+
   sendEmail(id: number): Observable<any> {
     return this.http.post(`${this.apiUrl}/${id}/send-email`, {});
   }

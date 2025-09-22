@@ -9,7 +9,7 @@ trait ApiResponseTrait
     /**
      * Respuesta exitosa
      *
-     * @param mixed $data
+     * @param mixed|array|object|null $data
      * @param string $message
      * @param int $code
      * @return JsonResponse

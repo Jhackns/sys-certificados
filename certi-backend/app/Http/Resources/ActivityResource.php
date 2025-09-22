@@ -22,15 +22,7 @@ class ActivityResource extends JsonResource
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,
             'is_active' => $this->is_active,
-            'company_id' => $this->company_id,
             'certificates_count' => $this->when(isset($this->certificates_count), $this->certificates_count),
-            'company' => $this->whenLoaded('company', function () {
-                return [
-                    'id' => $this->company->id,
-                    'name' => $this->company->name,
-                    'ruc' => $this->company->ruc,
-                ];
-            }),
             'certificates' => $this->whenLoaded('certificates', function () {
                 return $this->certificates->map(function ($certificate) {
                     return [

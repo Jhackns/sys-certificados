@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('activity_id')->constrained('activities')->onDelete('cascade');
             $table->foreignId('id_template')->constrained('certificate_templates')->onDelete('cascade');
-            $table->foreignId('signed_by')->constrained('users')->onDelete('cascade');
+            $table->foreignId('signed_by')->nullable()->constrained('users')->onDelete('cascade');
             $table->string('nombre');
             $table->text('descripcion')->nullable();
             $table->string('unique_code')->unique();
@@ -24,7 +24,7 @@ return new class extends Migration
             $table->date('fecha_emision');
             $table->date('fecha_vencimiento')->nullable();
             $table->timestamp('issued_at');
-            $table->enum('status', ['active', 'revoked', 'expired'])->default('active');
+            $table->enum('status', ['active', 'revoked', 'expired', 'issued', 'pending', 'cancelled'])->default('active');
             $table->timestamps();
         });
     }

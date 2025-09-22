@@ -44,10 +44,6 @@ export const routes: Routes = [
         loadComponent: () => import('./features/management/certificates/certificates.component').then(m => m.CertificatesComponent)
       },
       {
-        path: 'crear-certificado',
-        loadComponent: () => import('./features/management/certificates/create-certificate.component').then(m => m.CreateCertificateComponent)
-      },
-      {
         path: 'mis-certificados',
         loadComponent: () => import('./features/management/certificates/my-certificates.component').then(m => m.MyCertificatesComponent)
       },

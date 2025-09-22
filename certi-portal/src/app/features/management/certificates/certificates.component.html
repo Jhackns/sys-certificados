@@ -1,174 +1,298 @@
-<div class="page">
+<div class="certificates-page">
+  <!-- Header -->
   <div class="page-header">
     <div>
       <h1>Gestión de Certificados</h1>
       <p>Administra todos los certificados del sistema</p>
     </div>
-    <div class="header-actions">
-      <button class="btn btn-primary" (click)="openCreateModal()">Nuevo Certificado</button>
-    </div>
+    <button class="btn btn-primary" (click)="openCreateModal()">
+      <i class="fas fa-plus"></i>
+      Nuevo Certificado
+    </button>
   </div>
 
-  <div class="content-card">
-          <!-- Filtros -->
-          <form [formGroup]="filterForm" (ngSubmit)="applyFilters()" class="filters">
-            <input class="input" type="text" placeholder="Buscar por nombre o código" formControlName="search">
-            <select class="input" formControlName="status">
-              <option value="">Todos</option>
-              <option value="issued">Emitido</option>
-              <option value="pending">Pendiente</option>
-              <option value="cancelled">Cancelado</option>
-              <option value="expired">Expirado</option>
-            </select>
-            <select class="input" formControlName="template_id">
-              <option value="">Todas las plantillas</option>
-              <option *ngFor="let template of templates()" [value]="template.id">{{ template.name }}</option>
-            </select>
-            <input class="input" type="date" placeholder="Fecha emisión desde" formControlName="fecha_emision">
-            <input class="input" type="date" placeholder="Fecha vencimiento hasta" formControlName="fecha_vencimiento">
-            <button class="btn" type="submit">Filtrar</button>
-            <button class="btn btn-outline" type="button" (click)="resetFilters()">Limpiar</button>
-          </form>
-
-          <!-- Mensajes -->
-          <div *ngIf="errorMessage()" class="alert alert-danger">
-            {{ errorMessage() }}
-          </div>
-          <div *ngIf="successMessage()" class="alert alert-success">
-            {{ successMessage() }}
-          </div>
-
-          <!-- Tabla de certificados -->
-          <div class="table-responsive">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Código</th>
-                  <th>Nombre</th>
-                  <th>Usuario</th>
-                  <th>Plantilla</th>
-                  <th>Actividad</th>
-                  <th>Fecha de emisión</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngIf="isLoading()">
-                  <td colspan="8" class="text-center">Cargando...</td>
-                </tr>
-                <tr *ngIf="!isLoading() && certificates().length === 0">
-                  <td colspan="8" class="text-center">No se encontraron certificados</td>
-                </tr>
-                <tr *ngFor="let certificate of certificates()">
-                  <td>{{ certificate.unique_code }}</td>
-                  <td>{{ certificate.nombre }}</td>
-                  <td>{{ certificate.user?.name || 'N/A' }}</td>
-                  <td>{{ certificate.template?.name || 'N/A' }}</td>
-                  <td>{{ certificate.activity?.name || 'N/A' }}</td>
-                  <td>{{ formatDate(certificate.fecha_emision) }}</td>
-                  <td>
-                    <span class="badge badge-{{ getStatusColor(certificate.status) }}">
-                      {{ getStatusText(certificate.status) }}
-                    </span>
-                  </td>
-                  <td>
-                    <div class="actions">
-                      <button class="btn btn-sm" (click)="openViewModal(certificate)">Ver</button>
-                      <button class="btn btn-sm" (click)="downloadCertificate(certificate.id)">Descargar</button>
-                      <button class="btn btn-sm" (click)="sendCertificateEmail(certificate.id)">Enviar</button>
-                      <button class="btn btn-sm" (click)="openEditModal(certificate)">Editar</button>
-                      <button class="btn btn-sm btn-danger" (click)="openDeleteModal(certificate)">Eliminar</button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Paginación -->
-          <div class="row" *ngIf="!isLoading() && totalPages() > 1">
-            <div class="col-12">
-              <nav>
-                <ul class="pagination justify-content-center">
-                  <li class="page-item" [class.disabled]="currentPage() === 1">
-                    <a class="page-link" href="javascript:void(0)" (click)="goToPage(currentPage() - 1)">Anterior</a>
-                  </li>
-                  <li class="page-item" *ngFor="let page of [].constructor(totalPages()); let i = index"
-                      [class.active]="currentPage() === i + 1">
-                    <a class="page-link" href="javascript:void(0)" (click)="goToPage(i + 1)">{{ i + 1 }}</a>
-                  </li>
-                  <li class="page-item" [class.disabled]="currentPage() === totalPages()">
-                    <a class="page-link" href="javascript:void(0)" (click)="goToPage(currentPage() + 1)">Siguiente</a>
-                  </li>
-                </ul>
-              </nav>
-            </div>
-          </div>
+  <!-- Mensajes de alerta -->
+  <div class="alert alert-success" *ngIf="successMessage()">
+    <i class="fas fa-check-circle"></i>
+    {{ successMessage() }}
   </div>
 
-  <!-- Modal Crear -->
-  <div class="modal-overlay" *ngIf="showCreateModal()" (click)="closeModals()">
-    <div class="modal-content modal-large" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h3>Nuevo Certificado</h3>
-        <button class="modal-close" (click)="closeModals()">&times;</button>
+  <div class="alert alert-error" *ngIf="errorMessage()">
+    <i class="fas fa-exclamation-circle"></i>
+    {{ errorMessage() }}
+  </div>
+
+  <!-- Filtros -->
+  <div class="filters-section">
+    <form [formGroup]="filterForm" (ngSubmit)="applyFilters()" class="filters-form">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input
+          type="text"
+          class="form-control"
+          placeholder="Buscar por nombre o código..."
+          formControlName="search"
+        >
       </div>
-      <div class="modal-body-flex">
-        <form [formGroup]="createForm" (ngSubmit)="createCertificate()" class="modal-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Nombre del certificado</label>
-              <input class="form-control" type="text" formControlName="nombre" placeholder="Certificado de Participación" />
+
+      <div class="filter-group">
+        <select class="form-control" formControlName="status">
+          <option value="">Todos los estados</option>
+          <option value="issued">Emitido</option>
+          <option value="pending">Pendiente</option>
+          <option value="cancelled">Cancelado</option>
+          <option value="expired">Expirado</option>
+        </select>
+
+        <select class="form-control" formControlName="template_id">
+          <option value="">Todas las plantillas</option>
+          <option *ngFor="let template of templates()" [value]="template.id">{{ template.name }}</option>
+        </select>
+
+        <input class="form-control" type="date" placeholder="Fecha emisión desde" formControlName="fecha_emision">
+        <input class="form-control" type="date" placeholder="Fecha vencimiento hasta" formControlName="fecha_vencimiento">
+
+        <div class="filter-actions">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-filter"></i>
+            Filtrar
+          </button>
+          <button type="button" class="btn btn-outline" (click)="resetFilters()">
+            <i class="fas fa-times"></i>
+            Limpiar
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Contenedor de tabla -->
+  <div class="table-container">
+    <table class="certificates-table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Nombre</th>
+          <th>Usuario</th>
+          <th>Plantilla</th>
+          <th>Actividad</th>
+          <th>Fecha de emisión</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Estado de carga -->
+        <tr *ngIf="isLoading()" class="loading-row">
+          <td colspan="8">
+            <div class="loading-spinner">
+              <i class="fas fa-spinner fa-spin"></i>
+              Cargando certificados...
             </div>
+          </td>
+        </tr>
+
+        <!-- Estado vacío -->
+        <tr *ngIf="!isLoading() && certificates().length === 0" class="empty-row">
+          <td colspan="8">
+            <div class="empty-state">
+              <i class="fas fa-certificate"></i>
+              <p>No se encontraron certificados</p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Filas de certificados -->
+        <tr *ngFor="let certificate of certificates()" class="certificate-row">
+          <td>
+            <span class="certificate-code">{{ certificate.unique_code }}</span>
+          </td>
+          <td>
+            <div class="certificate-info">
+              <strong>{{ certificate.nombre }}</strong>
+              <small *ngIf="certificate.descripcion">{{ certificate.descripcion }}</small>
+            </div>
+          </td>
+          <td>{{ certificate.user?.name || 'N/A' }}</td>
+          <td>{{ certificate.template?.name || 'N/A' }}</td>
+          <td>{{ certificate.activity?.name || 'N/A' }}</td>
+          <td>{{ formatDate(certificate.fecha_emision) }}</td>
+          <td>
+            <span class="badge" [class]="getStatusBadgeClass(certificate.status)">
+              {{ getStatusText(certificate.status) }}
+            </span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button
+                class="btn-icon btn-view"
+                (click)="openViewModal(certificate)"
+                title="Ver detalles"
+              >
+                <i class="fas fa-eye"></i>
+              </button>
+              <button
+                class="btn-icon btn-download"
+                (click)="openDownloadModal(certificate)"
+                title="Descargar"
+              >
+                <i class="fas fa-download"></i>
+              </button>
+              <button
+                class="btn-icon btn-send"
+                (click)="sendCertificateEmail(certificate.id)"
+                title="Enviar por email"
+              >
+                <i class="fas fa-envelope"></i>
+              </button>
+              <button
+                class="btn-icon btn-edit"
+                (click)="openEditModal(certificate)"
+                title="Editar"
+              >
+                <i class="fas fa-edit"></i>
+              </button>
+              <button
+                class="btn-icon btn-delete"
+                (click)="openDeleteModal(certificate)"
+                title="Eliminar"
+              >
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Paginación -->
+  <div class="pagination-container" *ngIf="!isLoading() && totalPages() > 1">
+    <nav class="pagination-nav">
+      <button 
+        class="pagination-btn" 
+        [disabled]="currentPage() === 1"
+        (click)="goToPage(currentPage() - 1)"
+      >
+        <i class="fas fa-chevron-left"></i>
+        Anterior
+      </button>
+      
+      <div class="pagination-info">
+        Página {{ currentPage() }} de {{ totalPages() }}
+      </div>
+      
+      <button 
+        class="pagination-btn" 
+        [disabled]="currentPage() === totalPages()"
+        (click)="goToPage(currentPage() + 1)"
+      >
+        Siguiente
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </nav>
+  </div>
+</div>
+
+<!-- Modal Crear -->
+<div class="modal-overlay" *ngIf="showCreateModal()" (click)="closeModals()">
+  <div class="modal-dialog modal-responsive" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>
+        <i class="fas fa-plus-circle"></i>
+        Nuevo Certificado
+      </h3>
+      <button class="btn-close" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <form [formGroup]="createForm" (ngSubmit)="createCertificate()">
+      <div class="modal-body">
+        <!-- Información básica -->
+        <div class="form-section">
+          <div class="form-section-header">
+            <h4><i class="fas fa-info-circle"></i> Información Básica</h4>
+          </div>
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label>Nombre del certificado <span class="required">*</span></label>
+              <input 
+                class="form-control" 
+                type="text" 
+                formControlName="nombre" 
+                placeholder="Certificado de Participación"
+                [class.invalid]="createForm.get('nombre')?.invalid && createForm.get('nombre')?.touched"
+              />
+              <div class="error-message" *ngIf="createForm.get('nombre')?.invalid && createForm.get('nombre')?.touched">
+                <span *ngIf="createForm.get('nombre')?.errors?.['required']">El nombre es requerido</span>
+              </div>
+            </div>
+            
             <div class="form-group">
-              <label>Usuario</label>
-              <select class="form-control" formControlName="user_id">
+              <label>Usuario <span class="required">*</span></label>
+              <select 
+                class="form-control" 
+                formControlName="user_id"
+                [class.invalid]="createForm.get('user_id')?.invalid && createForm.get('user_id')?.touched"
+              >
                 <option value="">Seleccione usuario</option>
                 <option *ngFor="let user of users()" [value]="user.id">{{ user.name }} ({{ user.email }})</option>
               </select>
+              <div class="error-message" *ngIf="createForm.get('user_id')?.invalid && createForm.get('user_id')?.touched">
+                <span *ngIf="createForm.get('user_id')?.errors?.['required']">El usuario es requerido</span>
+              </div>
             </div>
-          </div>
-          <div class="form-row">
+            
             <div class="form-group">
-              <label>Descripción (opcional)</label>
-              <textarea class="form-control" formControlName="descripcion" placeholder="Descripción del certificado"></textarea>
-            </div>
-            <div class="form-group">
-              <label>Actividad</label>
-              <select class="form-control" formControlName="activity_id">
+              <label>Actividad <span class="required">*</span></label>
+              <select 
+                class="form-control" 
+                formControlName="activity_id"
+                [class.invalid]="createForm.get('activity_id')?.invalid && createForm.get('activity_id')?.touched"
+              >
                 <option value="">Seleccione actividad</option>
-                <option *ngFor="let a of activities()" [value]="a.id">{{ a.name }}</option>
+                <option *ngFor="let activity of activities()" [value]="activity.id">{{ activity.name }}</option>
               </select>
+              <div class="error-message" *ngIf="createForm.get('activity_id')?.invalid && createForm.get('activity_id')?.touched">
+                <span *ngIf="createForm.get('activity_id')?.errors?.['required']">La actividad es requerida</span>
+              </div>
+            </div>
+            
+            <div class="form-group full-width">
+              <label>Descripción (opcional)</label>
+              <textarea 
+                class="form-control" 
+                formControlName="descripcion" 
+                placeholder="Descripción del certificado" 
+                rows="3"
+              ></textarea>
             </div>
           </div>
-          <div class="form-row">
+        </div>
+
+        <!-- Configuración de plantilla -->
+        <div class="form-section">
+          <div class="form-section-header">
+            <h4><i class="fas fa-file-alt"></i> Plantilla y Fechas</h4>
+          </div>
+          <div class="form-grid">
             <div class="form-group">
-              <label>Plantilla</label>
-              <select class="form-control" formControlName="id_template" (change)="onTemplateChange($any($event.target).value)">
+              <label>Plantilla <span class="required">*</span></label>
+              <select 
+                class="form-control" 
+                formControlName="id_template" 
+                (change)="onTemplateChange($any($event.target).value)"
+                [class.invalid]="createForm.get('id_template')?.invalid && createForm.get('id_template')?.touched"
+              >
                 <option value="">Seleccione plantilla</option>
-                <option *ngFor="let t of templates()" [value]="t.id">{{ t.name }}</option>
+                <option *ngFor="let template of templates()" [value]="template.id">{{ template.name }}</option>
               </select>
+              <div class="error-message" *ngIf="createForm.get('id_template')?.invalid && createForm.get('id_template')?.touched">
+                <span *ngIf="createForm.get('id_template')?.errors?.['required']">La plantilla es requerida</span>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Fecha de emisión</label>
-              <input class="form-control" type="date" formControlName="fecha_emision" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Fecha de vencimiento (opcional)</label>
-              <input class="form-control" type="date" formControlName="fecha_vencimiento" />
-            </div>
-            <div class="form-group">
-              <label>Firmado por (opcional)</label>
-              <select class="form-control" formControlName="signed_by">
-                <option value="">Sin firmar</option>
-                <option *ngFor="let user of users()" [value]="user.id">{{ user.name }}</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
+            
             <div class="form-group">
               <label>Estado</label>
               <select class="form-control" formControlName="status">
@@ -178,20 +302,50 @@
                 <option value="expired">Expirado</option>
               </select>
             </div>
+            
+            <div class="form-group">
+              <label>Fecha de emisión <span class="required">*</span></label>
+              <input 
+                class="form-control" 
+                type="date" 
+                formControlName="fecha_emision"
+                [class.invalid]="createForm.get('fecha_emision')?.invalid && createForm.get('fecha_emision')?.touched"
+              />
+              <div class="error-message" *ngIf="createForm.get('fecha_emision')?.invalid && createForm.get('fecha_emision')?.touched">
+                <span *ngIf="createForm.get('fecha_emision')?.errors?.['required']">La fecha de emisión es requerida</span>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label>Fecha de vencimiento (opcional)</label>
+              <input class="form-control" type="date" formControlName="fecha_vencimiento" />
+            </div>
+            
+            <div class="form-group full-width">
+              <label>Firmado por (opcional)</label>
+              <select class="form-control" formControlName="signed_by">
+                <option value="">Sin firmar</option>
+                <option *ngFor="let user of users()" [value]="user.id">{{ user.name }}</option>
+              </select>
+            </div>
           </div>
-          <div class="modal-actions">
-            <button type="button" class="btn btn-outline" (click)="closeModals()">Cancelar</button>
-            <button type="submit" class="btn btn-primary" [disabled]="createForm.invalid || isLoading()">{{ isLoading() ? 'Creando...' : 'Crear' }}</button>
-          </div>
-        </form>
+        </div>
 
         <!-- Vista previa de plantilla -->
-        <div class="template-preview">
-          <h4>Vista Previa de Plantilla</h4>
-          <div class="preview-container" *ngIf="selectedTemplate(); else noTemplate">
+        <div class="form-section" *ngIf="selectedTemplate()">
+          <div class="form-section-header">
+            <h4><i class="fas fa-eye"></i> Vista Previa de Plantilla</h4>
+          </div>
+          <div class="template-preview-section">
             <div class="template-info">
-              <h5>{{ selectedTemplate()?.name }}</h5>
-              <p *ngIf="selectedTemplate()?.description">{{ selectedTemplate()?.description }}</p>
+              <div class="template-details">
+                <h5>{{ selectedTemplate()?.name }}</h5>
+                <p *ngIf="selectedTemplate()?.description">{{ selectedTemplate()?.description }}</p>
+                <span class="template-stats">
+                  <i class="fas fa-certificate"></i>
+                  {{ selectedTemplate()?.certificates_count || 0 }} certificados generados
+                </span>
+              </div>
             </div>
             <div class="preview-image" *ngIf="templatePreview(); else noPreview">
               <img [src]="templatePreview()" [alt]="selectedTemplate()?.name" class="template-img" />
@@ -203,63 +357,221 @@
               </div>
             </ng-template>
           </div>
-          <ng-template #noTemplate>
-            <div class="no-template">
-              <i class="fas fa-file-alt"></i>
-              <p>Seleccione una plantilla para ver la vista previa</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" (click)="closeModals()">
+          <i class="fas fa-times"></i>
+          Cancelar
+        </button>
+        <button type="submit" class="btn btn-primary" [disabled]="createForm.invalid || isLoading()">
+          <i class="fas fa-plus" *ngIf="!isLoading()"></i>
+          <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
+          {{ isLoading() ? 'Creando...' : 'Crear Certificado' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal para ver detalles -->
+<div class="modal-overlay" *ngIf="showViewModal()" (click)="closeModals()">
+  <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>
+        <i class="fas fa-eye"></i>
+        Detalles del Certificado
+      </h3>
+      <button class="btn-close" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body" *ngIf="selectedCertificate()">
+      <!-- Detalles del certificado -->
+      <div class="details-section">
+        <h4><i class="fas fa-info-circle"></i> Información del Certificado</h4>
+        <div class="details-grid">
+          <div class="detail-item">
+            <label>Código:</label>
+            <span>{{ selectedCertificate()?.unique_code }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Nombre:</label>
+            <span>{{ selectedCertificate()?.nombre }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Descripción:</label>
+            <span>{{ selectedCertificate()?.descripcion || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Usuario:</label>
+            <span>{{ selectedCertificate()?.user?.name || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Email:</label>
+            <span>{{ selectedCertificate()?.user?.email || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Actividad:</label>
+            <span>{{ selectedCertificate()?.activity?.name || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Plantilla:</label>
+            <span>{{ selectedCertificate()?.template?.name || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Fecha de emisión:</label>
+            <span>{{ formatDate(selectedCertificate()?.fecha_emision) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Fecha de vencimiento:</label>
+            <span>{{ formatDate(selectedCertificate()?.fecha_vencimiento) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Firmado por:</label>
+            <span>{{ selectedCertificate()?.signer?.name || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Estado:</label>
+            <span class="badge" [class]="getStatusBadgeClass(selectedCertificate()?.status || '')">
+              {{ getStatusText(selectedCertificate()?.status || '') }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vista previa del certificado -->
+      <div class="certificate-preview-section">
+        <h4><i class="fas fa-file-pdf"></i> Vista Previa del Certificado</h4>
+        <div class="certificate-preview-container">
+          <div class="certificate-preview" *ngIf="certificatePreview(); else noCertificatePreview">
+            <img [src]="certificatePreview()" [alt]="'Certificado de ' + selectedCertificate()?.user?.name" class="certificate-img" />
+          </div>
+          <ng-template #noCertificatePreview>
+            <div class="no-preview">
+              <i class="fas fa-file-pdf"></i>
+              <p>Cargando vista previa del certificado...</p>
+              <button class="btn btn-primary btn-sm" (click)="loadCertificatePreview(selectedCertificate()?.id || 0)">
+                <i class="fas fa-refresh"></i>
+                Cargar Vista Previa
+              </button>
             </div>
           </ng-template>
         </div>
       </div>
     </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary" (click)="openDownloadModal(selectedCertificate()!)">
+        <i class="fas fa-download"></i>
+        Descargar
+      </button>
+      <button type="button" class="btn btn-success" (click)="sendCertificateEmail(selectedCertificate()?.id || 0)">
+        <i class="fas fa-envelope"></i>
+        Enviar por Email
+      </button>
+      <button type="button" class="btn btn-outline" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+        Cerrar
+      </button>
+    </div>
   </div>
 </div>
 
-<!-- Modal para ver detalles -->
-<div class="modal fade" [class.show]="showViewModal()" [style.display]="showViewModal() ? 'block' : 'none'" tabindex="-1" role="dialog">
-  <div class="modal-dialog modal-lg" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Detalles del Certificado</h5>
-        <button type="button" class="close" (click)="closeModals()">
-          <span aria-hidden="true">&times;</span>
+<!-- Modal para eliminar certificado -->
+<div class="modal-overlay" *ngIf="showDeleteModal()" (click)="closeModals()">
+  <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>
+        <i class="fas fa-exclamation-triangle text-danger"></i>
+        Confirmar Eliminación
+      </h3>
+      <button class="btn-close" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body" *ngIf="selectedCertificate()">
+      <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>¡Atención!</strong> Esta acción no se puede deshacer.
+      </div>
+      <p>¿Estás seguro de que deseas eliminar el certificado:</p>
+      <div class="certificate-info">
+        <strong>{{ selectedCertificate()?.nombre }}</strong><br>
+        <small>Usuario: {{ selectedCertificate()?.user?.name }}</small><br>
+        <small>Código: {{ selectedCertificate()?.unique_code }}</small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+        Cancelar
+      </button>
+      <button type="button" class="btn btn-danger" (click)="deleteCertificate()" [disabled]="isLoading()">
+        <i class="fas fa-trash" *ngIf="!isLoading()"></i>
+        <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
+        {{ isLoading() ? 'Eliminando...' : 'Eliminar' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para seleccionar formato de descarga -->
+<div class="modal-overlay" *ngIf="showDownloadModal()" (click)="closeModals()">
+  <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>
+        <i class="fas fa-download"></i>
+        Seleccionar Formato
+      </h3>
+      <button class="btn-close" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body" *ngIf="selectedCertificate()">
+      <p>Selecciona el formato en el que deseas descargar el certificado:</p>
+      <div class="certificate-info">
+        <strong>{{ selectedCertificate()?.nombre }}</strong><br>
+        <small>{{ selectedCertificate()?.user?.name }}</small>
+      </div>
+      
+      <div class="download-options">
+        <button 
+          type="button" 
+          class="btn btn-download-pdf" 
+          (click)="downloadCertificateFormat('pdf')"
+          [disabled]="isLoading()"
+        >
+          <i class="fas fa-file-pdf"></i>
+          <span>Descargar PDF</span>
+          <small>Formato estándar para impresión</small>
+        </button>
+        
+        <button 
+          type="button" 
+          class="btn btn-download-jpg" 
+          (click)="downloadCertificateFormat('jpg')"
+          [disabled]="isLoading()"
+        >
+          <i class="fas fa-file-image"></i>
+          <span>Descargar JPG</span>
+          <small>Formato de imagen para compartir</small>
         </button>
       </div>
-      <div class="modal-body" *ngIf="selectedCertificate()">
-        <div class="row">
-          <div class="col-md-6">
-            <p><strong>Código:</strong> {{ selectedCertificate()?.unique_code }}</p>
-            <p><strong>Nombre:</strong> {{ selectedCertificate()?.nombre }}</p>
-            <p><strong>Descripción:</strong> {{ selectedCertificate()?.descripcion || 'N/A' }}</p>
-            <p><strong>Usuario:</strong> {{ selectedCertificate()?.user?.name || 'N/A' }}</p>
-            <p><strong>Email:</strong> {{ selectedCertificate()?.user?.email || 'N/A' }}</p>
-          </div>
-          <div class="col-md-6">
-            <p><strong>Actividad:</strong> {{ selectedCertificate()?.activity?.name || 'N/A' }}</p>
-            <p><strong>Plantilla:</strong> {{ selectedCertificate()?.template?.name || 'N/A' }}</p>
-            <p><strong>Fecha de emisión:</strong> {{ formatDate(selectedCertificate()?.fecha_emision) }}</p>
-            <p><strong>Fecha de vencimiento:</strong> {{ formatDate(selectedCertificate()?.fecha_vencimiento) }}</p>
-            <p><strong>Firmado por:</strong> {{ selectedCertificate()?.signer?.name || 'N/A' }}</p>
-            <p><strong>Estado:</strong>
-              <span class="badge badge-{{ getStatusColor(selectedCertificate()?.status || '') }}">
-                {{ getStatusText(selectedCertificate()?.status || '') }}
-              </span>
-            </p>
-          </div>
-        </div>
+      
+      <div class="loading-message" *ngIf="isLoading()">
+        <i class="fas fa-spinner fa-spin"></i>
+        Preparando descarga...
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-primary" (click)="downloadCertificate(selectedCertificate()?.id || 0)">
-          <i class="fas fa-download"></i> Descargar
-        </button>
-        <button type="button" class="btn btn-success" (click)="sendCertificateEmail(selectedCertificate()?.id || 0)">
-          <i class="fas fa-envelope"></i> Enviar por Email
-        </button>
-        <button type="button" class="btn btn-secondary" (click)="closeModals()">Cerrar</button>
-      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+        Cancelar
+      </button>
     </div>
   </div>
 </div>
 
 <!-- Overlay para modales -->
-<div class="modal-backdrop fade show" *ngIf="showViewModal() || showCreateModal() || showEditModal() || showDeleteModal()"></div>
+<div class="modal-backdrop fade show" *ngIf="showViewModal() || showCreateModal() || showEditModal() || showDeleteModal() || showDownloadModal()"></div>

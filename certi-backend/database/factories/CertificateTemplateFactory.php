@@ -17,7 +17,7 @@ class CertificateTemplateFactory extends Factory
     public function definition(): array
     {
         $activityType = $this->faker->randomElement(['course', 'event', 'other']);
-        
+
         return [
 'name' => $this->generateTemplateName($activityType),
             'description' => $this->faker->sentence(10),
@@ -34,13 +34,13 @@ class CertificateTemplateFactory extends Factory
     {
         $designs = ['Clásico', 'Moderno', 'Elegante', 'Corporativo', 'Minimalista'];
         $colors = ['Azul', 'Verde', 'Dorado', 'Plateado', 'Rojo'];
-        
+
         $design = $this->faker->randomElement($designs);
         $color = $this->faker->randomElement($colors);
-        
+
         return match ($activityType) {
             'course' => "Plantilla {$design} {$color} - Cursos",
-            'event' => "Plantilla {$design} {$color} - Eventos", 
+            'event' => "Plantilla {$design} {$color} - Eventos",
             'other' => "Plantilla {$design} {$color} - General",
         };
     }
@@ -98,13 +98,5 @@ class CertificateTemplateFactory extends Factory
         ]);
     }
 
-    /**
-     * Indicate that the template belongs to a specific company.
-     */
-    public function forCompany(Company $company): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'company_id' => $company->id,
-        ]);
-    }
+
 }

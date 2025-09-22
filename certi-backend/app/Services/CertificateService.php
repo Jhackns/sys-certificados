@@ -45,24 +45,98 @@ class CertificateService
     public function create(array $data): Certificate
     {
         return DB::transaction(function () use ($data) {
+            Log::info('=== INICIO CREACIÓN CERTIFICADO ===');
+            Log::info('Datos recibidos para crear certificado', ['data' => $data]);
+
+            // Verificar que los IDs de relaciones existan
+            if (isset($data['user_id'])) {
+                $userExists = \App\Models\User::find($data['user_id']);
+                Log::info('Verificación user_id', [
+                    'user_id' => $data['user_id'],
+                    'exists' => $userExists ? 'SÍ' : 'NO',
+                    'user_data' => $userExists ? ['id' => $userExists->id, 'name' => $userExists->name] : null
+                ]);
+                if (!$userExists) {
+                    throw new \Exception("Usuario con ID {$data['user_id']} no existe");
+                }
+            }
+
+            if (isset($data['activity_id'])) {
+                $activityExists = \App\Models\Activity::find($data['activity_id']);
+                Log::info('Verificación activity_id', [
+                    'activity_id' => $data['activity_id'],
+                    'exists' => $activityExists ? 'SÍ' : 'NO',
+                    'activity_data' => $activityExists ? ['id' => $activityExists->id, 'name' => $activityExists->name] : null
+                ]);
+                if (!$activityExists) {
+                    throw new \Exception("Actividad con ID {$data['activity_id']} no existe");
+                }
+            }
+
+            if (isset($data['id_template'])) {
+                $templateExists = \App\Models\CertificateTemplate::find($data['id_template']);
+                Log::info('Verificación id_template', [
+                    'id_template' => $data['id_template'],
+                    'exists' => $templateExists ? 'SÍ' : 'NO',
+                    'template_data' => $templateExists ? ['id' => $templateExists->id, 'name' => $templateExists->name] : null
+                ]);
+                if (!$templateExists) {
+                    throw new \Exception("Plantilla con ID {$data['id_template']} no existe");
+                }
+            }
+
             // Generar código único del certificado
-            $data['unique_code'] = $this->generateCertificateCode();
+            $uniqueCode = $this->generateCertificateCode();
+            $data['unique_code'] = $uniqueCode;
+            Log::info('Código único generado', ['unique_code' => $uniqueCode]);
 
             // Establecer fecha de emisión si no se proporciona
             if (!isset($data['fecha_emision'])) {
                 $data['fecha_emision'] = now()->format('Y-m-d');
+                Log::info('Fecha de emisión establecida automáticamente', ['fecha_emision' => $data['fecha_emision']]);
             }
 
             // Establecer issued_at si no se proporciona
             if (!isset($data['issued_at'])) {
                 $data['issued_at'] = now();
+                Log::info('Fecha issued_at establecida automáticamente', ['issued_at' => $data['issued_at']]);
             }
 
-            $certificate = Certificate::create($data);
+            Log::info('Datos finales antes de crear certificado', ['final_data' => $data]);
 
-            Log::info('Certificado creado exitosamente', ['certificate_id' => $certificate->id]);
+            try {
+                $certificate = Certificate::create($data);
+                Log::info('Certificate::create() ejecutado');
 
-            return $certificate;
+                if ($certificate) {
+                    Log::info('Certificado creado exitosamente', [
+                        'certificate_id' => $certificate->id,
+                        'certificate_data' => [
+                            'id' => $certificate->id,
+                            'user_id' => $certificate->user_id,
+                            'activity_id' => $certificate->activity_id,
+                            'id_template' => $certificate->id_template,
+                            'unique_code' => $certificate->unique_code,
+                            'nombre' => $certificate->nombre,
+                            'status' => $certificate->status
+                        ]
+                    ]);
+                } else {
+                    Log::error('Certificate::create() retornó null');
+                    throw new \Exception('Certificate::create() retornó null - Error en la creación');
+                }
+
+                Log::info('=== FIN CREACIÓN CERTIFICADO EXITOSA ===');
+                return $certificate;
+            } catch (\Exception $e) {
+                Log::error('Error en Certificate::create()', [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'data_sent' => $data
+                ]);
+                throw $e;
+            }
         });
     }
 
@@ -264,7 +338,7 @@ class CertificateService
     {
         do {
             $code = 'CERT-' . strtoupper(Str::random(8));
-        } while (Certificate::where('certificate_code', $code)->exists());
+        } while (Certificate::where('unique_code', $code)->exists());
 
         return $code;
     }

@@ -32,46 +32,44 @@ class ValidationController extends Controller
     {
         try {
             $perPage = $request->query('per_page', 15);
-            
+
             // Si hay criterios de búsqueda, usar el método search
-            if ($request->hasAny(['certificate_code', 'validation_code', 'validator_ip', 'date_from', 'date_to', 'company_id'])) {
-                $criteria = $request->only(['certificate_code', 'validation_code', 'validator_ip', 'date_from', 'date_to', 'company_id']);
+            if ($request->hasAny(['certificate_code', 'validation_code', 'validator_ip', 'date_from', 'date_to'])) {
+                $criteria = $request->only(['certificate_code', 'validation_code', 'validator_ip', 'date_from', 'date_to']);
                 $validations = $this->validationService->search($criteria, $perPage);
             } else {
                 $validations = $this->validationService->getAll($perPage);
             }
 
-            return $this->successResponse([
-                'validations' => $validations->items()->map(function ($validation) {
+            $validationsArray = [
+                'validations' => collect($validations->items())->map(function ($validation) {
                     return [
                         'id' => $validation->id,
                         'validation_code' => $validation->validation_code,
                         'validated_at' => $validation->validated_at,
                         'validator_ip' => $validation->validator_ip,
                         'validator_user_agent' => $validation->validator_user_agent,
-                        'certificate' => [
+                        'certificate' => $validation->certificate ? [
                             'id' => $validation->certificate->id,
-                            'certificate_code' => $validation->certificate->certificate_code,
+                            'unique_code' => $validation->certificate->unique_code,
                             'participant_name' => $validation->certificate->participant_name,
                             'participant_email' => $validation->certificate->participant_email,
-                            'activity' => [
+                            'activity' => $validation->certificate->activity ? [
                                 'id' => $validation->certificate->activity->id,
                                 'name' => $validation->certificate->activity->name,
-                                'company' => [
-                                    'id' => $validation->certificate->activity->company->id,
-                                    'name' => $validation->certificate->activity->company->name,
-                                ],
-                            ],
-                        ],
+                            ] : null,
+                        ] : null,
                     ];
-                }),
+                })->values()->toArray(),
                 'pagination' => [
                     'current_page' => $validations->currentPage(),
                     'last_page' => $validations->lastPage(),
                     'per_page' => $validations->perPage(),
                     'total' => $validations->total(),
                 ]
-            ], 'Validaciones obtenidas correctamente');
+            ];
+
+            return $this->successResponse($validationsArray, 'Validaciones obtenidas correctamente');
         } catch (\Exception $e) {
             Log::error('Error al obtener validaciones: ' . $e->getMessage());
             return $this->errorResponse('Error al obtener validaciones: ' . $e->getMessage(), 500);
@@ -89,7 +87,7 @@ class ValidationController extends Controller
         try {
             $id = (int) $id;
             $validation = $this->validationService->getById($id);
-        
+
             if (!$validation) {
                 return $this->notFoundResponse('Validación no encontrada');
             }
@@ -101,26 +99,22 @@ class ValidationController extends Controller
                     'validated_at' => $validation->validated_at,
                     'validator_ip' => $validation->validator_ip,
                     'validator_user_agent' => $validation->validator_user_agent,
-                    'certificate' => [
+                    'certificate' => $validation->certificate ? [
                         'id' => $validation->certificate->id,
-                        'certificate_code' => $validation->certificate->certificate_code,
+                        'unique_code' => $validation->certificate->unique_code,
                         'participant_name' => $validation->certificate->participant_name,
                         'participant_email' => $validation->certificate->participant_email,
                         'issue_date' => $validation->certificate->issue_date,
                         'expiry_date' => $validation->certificate->expiry_date,
                         'status' => $validation->certificate->status,
-                        'activity' => [
+                        'activity' => $validation->certificate->activity ? [
                             'id' => $validation->certificate->activity->id,
                             'name' => $validation->certificate->activity->name,
                             'description' => $validation->certificate->activity->description,
                             'duration_hours' => $validation->certificate->activity->duration_hours,
-                            'company' => [
-                                'id' => $validation->certificate->activity->company->id,
-                                'name' => $validation->certificate->activity->company->name,
-                                'ruc' => $validation->certificate->activity->company->ruc,
-                            ],
-                        ],
-                    ],
+
+                        ] : null,
+                    ] : null,
                 ]
             ], 'Validación obtenida correctamente');
         } catch (\Exception $e) {
@@ -143,7 +137,7 @@ class ValidationController extends Controller
             ]);
 
             $certificateCode = $request->input('certificate_code');
-            
+
             // Obtener datos del validador
             $validatorData = [
                 'validator_ip' => $request->ip(),
@@ -160,7 +154,7 @@ class ValidationController extends Controller
                 'message' => $result['message'],
                 'certificate' => [
                     'id' => $result['certificate']->id,
-                    'certificate_code' => $result['certificate']->certificate_code,
+                    'unique_code' => $result['certificate']->unique_code,
                     'participant_name' => $result['certificate']->participant_name,
                     'participant_email' => $result['certificate']->participant_email,
                     'issue_date' => $result['certificate']->issue_date,
@@ -171,11 +165,7 @@ class ValidationController extends Controller
                         'name' => $result['certificate']->activity->name,
                         'description' => $result['certificate']->activity->description,
                         'duration_hours' => $result['certificate']->activity->duration_hours,
-                        'company' => [
-                            'id' => $result['certificate']->activity->company->id,
-                            'name' => $result['certificate']->activity->company->name,
-                            'ruc' => $result['certificate']->activity->company->ruc,
-                        ],
+
                     ],
                 ],
                 'validation' => [
@@ -202,11 +192,11 @@ class ValidationController extends Controller
         try {
             $certificateId = (int) $certificateId;
             $perPage = $request->query('per_page', 15);
-            
+
             $validations = $this->validationService->getByCertificate($certificateId, $perPage);
 
-            return $this->successResponse([
-                'validations' => $validations->items()->map(function ($validation) {
+            $validationsByCertificate = [
+                'validations' => collect($validations->items())->map(function ($validation) {
                     return [
                         'id' => $validation->id,
                         'validation_code' => $validation->validation_code,
@@ -214,14 +204,16 @@ class ValidationController extends Controller
                         'validator_ip' => $validation->validator_ip,
                         'validator_user_agent' => $validation->validator_user_agent,
                     ];
-                }),
+                })->values()->toArray(),
                 'pagination' => [
                     'current_page' => $validations->currentPage(),
                     'last_page' => $validations->lastPage(),
                     'per_page' => $validations->perPage(),
                     'total' => $validations->total(),
                 ]
-            ], 'Validaciones del certificado obtenidas correctamente');
+            ];
+
+            return $this->successResponse($validationsByCertificate, 'Validaciones del certificado obtenidas correctamente');
         } catch (\Exception $e) {
             Log::error('Error al obtener validaciones por certificado: ' . $e->getMessage());
             return $this->errorResponse('Error al obtener validaciones: ' . $e->getMessage(), 500);
@@ -250,20 +242,17 @@ class ValidationController extends Controller
                     'validated_at' => $validation->validated_at,
                     'validator_ip' => $validation->validator_ip,
                     'validator_user_agent' => $validation->validator_user_agent,
-                    'certificate' => [
+                    'certificate' => $validation->certificate ? [
                         'id' => $validation->certificate->id,
-                        'certificate_code' => $validation->certificate->certificate_code,
+                        'certificate_code' => $validation->certificate->unique_code,
                         'participant_name' => $validation->certificate->participant_name,
                         'participant_email' => $validation->certificate->participant_email,
-                        'activity' => [
+                        'activity' => $validation->certificate->activity ? [
                             'id' => $validation->certificate->activity->id,
                             'name' => $validation->certificate->activity->name,
-                            'company' => [
-                                'id' => $validation->certificate->activity->company->id,
-                                'name' => $validation->certificate->activity->company->name,
-                            ],
-                        ],
-                    ],
+
+                        ] : null,
+                    ] : null,
                 ]
             ], 'Validación obtenida correctamente');
         } catch (\Exception $e) {
@@ -281,7 +270,7 @@ class ValidationController extends Controller
     public function statistics(Request $request): JsonResponse
     {
         try {
-            $filters = $request->only(['company_id', 'date_from', 'date_to']);
+            $filters = $request->only(['date_from', 'date_to']);
             $statistics = $this->validationService->getStatistics($filters);
 
             return $this->successResponse([

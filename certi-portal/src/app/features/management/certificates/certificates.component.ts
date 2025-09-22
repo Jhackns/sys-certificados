@@ -1,6 +1,6 @@
 import { Component, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { CertificateService } from './certificate.service';
 import { environment } from '../../../../environments/environment';
@@ -27,11 +27,6 @@ interface Certificate {
     id: number;
     name: string;
     description?: string;
-    company?: {
-      id: number;
-      name: string;
-      ruc: string;
-    };
   };
   template?: {
     id: number;
@@ -69,17 +64,27 @@ interface ApiResponse {
   styleUrl: './certificates.component.css'
 })
 export class CertificatesComponent implements OnInit {
-  certificates = signal<Certificate[]>([]);
+  // Señales para manejar estados
   isLoading = signal(false);
   errorMessage = signal('');
   successMessage = signal('');
-
-  // Modal states
+  
+  // Señales para modales
   showViewModal = signal(false);
   showCreateModal = signal(false);
   showEditModal = signal(false);
   showDeleteModal = signal(false);
+  showDownloadModal = signal(false);
+  
+  // Señales para datos
+  certificates = signal<Certificate[]>([]);
   selectedCertificate = signal<Certificate | null>(null);
+  users = signal<{ id: number; name: string; email: string }[]>([]);
+  activities = signal<{ id: number; name: string }[]>([]);
+  templates = signal<{ id: number; name: string }[]>([]);
+  selectedTemplate = signal<any>(null);
+  templatePreview = signal('');
+  certificatePreview = signal('');
 
   // Pagination
   currentPage = signal(1);
@@ -92,13 +97,6 @@ export class CertificatesComponent implements OnInit {
 
   // Create form
   createForm: FormGroup;
-
-  // Select options
-  activities = signal<{ id: number; name: string }[]>([]);
-  templates = signal<{ id: number; name: string }[]>([]);
-  users = signal<{ id: number; name: string; email: string }[]>([]);
-  selectedTemplate = signal<any>(null);
-  templatePreview = signal<string>('');
 
   constructor(
     private certificateService: CertificateService,
@@ -118,10 +116,10 @@ export class CertificatesComponent implements OnInit {
     this.createForm = this.fb.group({
       user_id: ['', [Validators.required]],
       id_template: ['', [Validators.required]],
-      nombre: ['', [Validators.required, Validators.minLength(2)]],
-      descripcion: [''],
+      nombre: ['', [Validators.required, Validators.maxLength(255)]],
+      descripcion: ['', [Validators.maxLength(1000)]],
       fecha_emision: ['', [Validators.required]],
-      fecha_vencimiento: [''],
+      fecha_vencimiento: ['', [this.dateAfterValidator('fecha_emision')]],
       activity_id: ['', [Validators.required]],
       signed_by: [''],
       status: ['issued']
@@ -147,7 +145,6 @@ export class CertificatesComponent implements OnInit {
     const filters = this.filterForm.value;
     if (filters.search) params.search = filters.search;
     if (filters.status) params.status = filters.status;
-    if (filters.company_id) params.company_id = filters.company_id;
     if (filters.activity_id) params.activity_id = filters.activity_id;
     if (filters.date_from) params.date_from = filters.date_from;
     if (filters.date_to) params.date_to = filters.date_to;
@@ -244,10 +241,6 @@ export class CertificatesComponent implements OnInit {
   }
 
   // Métodos para manejar modales
-  openViewModal(certificate: Certificate): void {
-    this.selectedCertificate.set(certificate);
-    this.showViewModal.set(true);
-  }
 
   openCreateModal(): void {
     this.showCreateModal.set(true);
@@ -268,7 +261,95 @@ export class CertificatesComponent implements OnInit {
     this.showCreateModal.set(false);
     this.showEditModal.set(false);
     this.showDeleteModal.set(false);
+    this.showDownloadModal.set(false);
     this.selectedCertificate.set(null);
+    this.certificatePreview.set('');
+  }
+
+  // Abrir modal de descarga
+  openDownloadModal(certificate: Certificate): void {
+    this.selectedCertificate.set(certificate);
+    this.showDownloadModal.set(true);
+  }
+
+  // Eliminar certificado
+  deleteCertificate(): void {
+    const certificate = this.selectedCertificate();
+    if (!certificate) return;
+
+    this.isLoading.set(true);
+    this.certificateService.deleteCertificate(certificate.id).subscribe({
+      next: (response: any) => {
+        this.isLoading.set(false);
+        if (response.success) {
+          this.successMessage.set('Certificado eliminado correctamente');
+          this.closeModals();
+          this.loadCertificates(this.currentPage());
+        } else {
+          this.errorMessage.set(response.message || 'Error al eliminar el certificado');
+        }
+      },
+      error: (error) => {
+        this.isLoading.set(false);
+        this.errorMessage.set('Error al eliminar el certificado');
+        console.error('Error deleting certificate:', error);
+      }
+    });
+  }
+
+  // Descargar certificado en formato específico
+  downloadCertificateFormat(format: 'pdf' | 'jpg'): void {
+    const certificate = this.selectedCertificate();
+    if (!certificate) return;
+
+    this.isLoading.set(true);
+    
+    // Llamar al servicio con el formato específico
+    this.certificateService.downloadCertificateFormat(certificate.id, format).subscribe({
+      next: (blob) => {
+        this.isLoading.set(false);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `certificado-${certificate.id}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+        this.closeModals();
+        this.successMessage.set(`Certificado descargado en formato ${format.toUpperCase()}`);
+      },
+      error: (error) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(`Error al descargar el certificado en formato ${format.toUpperCase()}`);
+        console.error('Error downloading certificate:', error);
+      }
+    });
+  }
+
+  // Cargar vista previa del certificado
+  loadCertificatePreview(certificateId: number): void {
+    this.http.get<any>(`${environment.apiUrl}/certificates/${certificateId}/preview`).subscribe({
+      next: (response) => {
+        if (response?.success && response.data?.preview_url) {
+          this.certificatePreview.set(response.data.preview_url);
+        } else {
+          this.certificatePreview.set('');
+        }
+      },
+      error: (error) => {
+        console.error('Error loading certificate preview:', error);
+        this.certificatePreview.set('');
+      }
+    });
+  }
+
+  // Abrir modal de vista y cargar vista previa automáticamente
+  openViewModal(certificate: Certificate): void {
+    this.selectedCertificate.set(certificate);
+    this.showViewModal.set(true);
+    // Cargar vista previa automáticamente
+    this.loadCertificatePreview(certificate.id);
   }
 
   // Crear certificado
@@ -380,6 +461,26 @@ export class CertificatesComponent implements OnInit {
     }
   }
 
+  // Método para obtener la clase CSS del badge de estado
+  getStatusBadgeClass(status: string): string {
+    switch (status.toLowerCase()) {
+      case 'emitido':
+      case 'issued':
+        return 'badge-issued';
+      case 'pendiente':
+      case 'pending':
+        return 'badge-pending';
+      case 'cancelado':
+      case 'cancelled':
+        return 'badge-cancelled';
+      case 'expirado':
+      case 'expired':
+        return 'badge-expired';
+      default:
+        return 'badge-issued';
+    }
+  }
+
   // Método para obtener el texto de estado
   getStatusText(status: string): string {
     switch (status.toLowerCase()) {
@@ -410,8 +511,10 @@ export class CertificatesComponent implements OnInit {
       // Cargar vista previa de la plantilla
       this.http.get<any>(`${environment.apiUrl}/certificate-templates/${templateId}/preview`).subscribe({
         next: (res) => {
-          if (res?.success && res.data?.preview_url) {
-            this.templatePreview.set(res.data.preview_url);
+          if (res?.success && res.data?.template?.file_url) {
+            this.templatePreview.set(res.data.template.file_url);
+          } else {
+            this.templatePreview.set('');
           }
         },
         error: () => {
@@ -419,5 +522,23 @@ export class CertificatesComponent implements OnInit {
         }
       });
     }
+  }
+
+  // Validador personalizado para fechas
+  dateAfterValidator(startDateField: string) {
+    return (control: AbstractControl): ValidationErrors | null => {
+      if (!control.value) return null;
+      
+      const form = control.parent;
+      if (!form) return null;
+      
+      const startDate = form.get(startDateField)?.value;
+      if (!startDate) return null;
+      
+      const start = new Date(startDate);
+      const end = new Date(control.value);
+      
+      return end <= start ? { dateAfter: true } : null;
+    };
   }
 }

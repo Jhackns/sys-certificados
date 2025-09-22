@@ -16,7 +16,7 @@ class CertificateTemplateService
      */
     public function getAll(int $perPage = 15)
     {
-        return CertificateTemplate::with(['company', 'certificates'])
+        return CertificateTemplate::with(['certificates'])
             ->withCount('certificates')
             ->paginate($perPage);
     }
@@ -29,7 +29,7 @@ class CertificateTemplateService
      */
     public function getById(int $id): ?CertificateTemplate
     {
-        return CertificateTemplate::with(['company', 'certificates'])
+        return CertificateTemplate::with(['certificates'])
             ->withCount('certificates')
             ->find($id);
     }
@@ -44,9 +44,9 @@ class CertificateTemplateService
     {
         return DB::transaction(function () use ($data) {
             $template = CertificateTemplate::create($data);
-            
+
             Log::info('Plantilla de certificado creada exitosamente', ['template_id' => $template->id]);
-            
+
             return $template;
         });
     }
@@ -61,11 +61,29 @@ class CertificateTemplateService
     public function update(CertificateTemplate $template, array $data): CertificateTemplate
     {
         return DB::transaction(function () use ($template, $data) {
+            Log::info('Datos recibidos para actualizar plantilla:', [
+                'template_id' => $template->id,
+                'data' => $data
+            ]);
+
             $template->update($data);
-            
-            Log::info('Plantilla de certificado actualizada exitosamente', ['template_id' => $template->id]);
-            
-            return $template->fresh();
+
+            Log::info('Plantilla de certificado actualizada exitosamente', [
+                'template_id' => $template->id,
+                'updated_fields' => array_keys($data)
+            ]);
+
+            $freshTemplate = $template->fresh();
+
+            Log::info('Plantilla después de actualizar:', [
+                'id' => $freshTemplate->id,
+                'name' => $freshTemplate->name,
+                'description' => $freshTemplate->description,
+                'activity_type' => $freshTemplate->activity_type,
+                'status' => $freshTemplate->status
+            ]);
+
+            return $freshTemplate;
         });
     }
 
@@ -85,11 +103,11 @@ class CertificateTemplateService
 
             $templateId = $template->id;
             $deleted = $template->delete();
-            
+
             if ($deleted) {
                 Log::info('Plantilla de certificado eliminada exitosamente', ['template_id' => $templateId]);
             }
-            
+
             return $deleted;
         });
     }
@@ -103,7 +121,7 @@ class CertificateTemplateService
      */
     public function search(array $criteria, int $perPage = 15)
     {
-        $query = CertificateTemplate::with(['company', 'certificates'])
+        $query = CertificateTemplate::with(['certificates'])
             ->withCount('certificates');
 
         if (isset($criteria['search'])) {
@@ -114,8 +132,12 @@ class CertificateTemplateService
             });
         }
 
-        if (isset($criteria['company_id'])) {
-            $query->where('company_id', $criteria['company_id']);
+        if (isset($criteria['activity_type'])) {
+            $query->where('activity_type', $criteria['activity_type']);
+        }
+
+        if (isset($criteria['status'])) {
+            $query->where('status', $criteria['status']);
         }
 
         if (isset($criteria['is_active'])) {
@@ -126,7 +148,7 @@ class CertificateTemplateService
     }
 
     /**
-     * Obtener plantillas por empresa
+     * Obtener plantillas por empresa (método obsoleto - ya no se usa company)
      *
      * @param int $companyId
      * @param int $perPage
@@ -134,10 +156,9 @@ class CertificateTemplateService
      */
     public function getByCompany(int $companyId, int $perPage = 15)
     {
-        return CertificateTemplate::with('certificates')
-            ->withCount('certificates')
-            ->where('company_id', $companyId)
-            ->paginate($perPage);
+        // Este método ya no es necesario ya que eliminamos la relación con company
+        // Devolvemos todas las plantillas en su lugar
+        return $this->getAll($perPage);
     }
 
     /**
@@ -149,13 +170,14 @@ class CertificateTemplateService
      */
     public function toggleStatus(CertificateTemplate $template, bool $status): CertificateTemplate
     {
-        $template->update(['is_active' => $status]);
-        
+        $statusValue = $status ? 'active' : 'inactive';
+        $template->update(['status' => $statusValue]);
+
         Log::info('Estado de plantilla actualizado', [
             'template_id' => $template->id,
-            'new_status' => $status
+            'new_status' => $statusValue
         ]);
-        
+
         return $template->fresh();
     }
 
@@ -170,25 +192,25 @@ class CertificateTemplateService
     {
         return DB::transaction(function () use ($template, $newData) {
             $clonedData = $template->toArray();
-            
+
             // Remover campos que no deben clonarse
             unset($clonedData['id'], $clonedData['created_at'], $clonedData['updated_at']);
-            
+
             // Aplicar nuevos datos
             $clonedData = array_merge($clonedData, $newData);
-            
+
             // Agregar sufijo al nombre si no se proporciona uno nuevo
             if (!isset($newData['name'])) {
                 $clonedData['name'] = $template->name . ' (Copia)';
             }
-            
+
             $clonedTemplate = CertificateTemplate::create($clonedData);
-            
+
             Log::info('Plantilla clonada exitosamente', [
                 'original_template_id' => $template->id,
                 'cloned_template_id' => $clonedTemplate->id
             ]);
-            
+
             return $clonedTemplate;
         });
     }

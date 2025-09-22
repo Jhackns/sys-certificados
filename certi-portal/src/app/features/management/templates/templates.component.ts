@@ -1,6 +1,7 @@
 import { Component, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { TemplateService, Template, TemplateFilters } from '../../../core/services/template.service';
 
 @Component({
@@ -17,6 +18,10 @@ export class TemplatesComponent implements OnInit {
   errorMessage = signal('');
   successMessage = signal('');
 
+  // File upload
+  selectedFile = signal<File | null>(null);
+  imagePreview = signal<string | null>(null);
+
   // Expose Math to template
   Math = Math;
 
@@ -25,7 +30,12 @@ export class TemplatesComponent implements OnInit {
   showEditModal = signal(false);
   showDeleteModal = signal(false);
   showViewModal = signal(false);
+  showImageModal = signal(false);
   selectedTemplate = signal<Template | null>(null);
+
+  // Image modal
+  imageModalUrl = signal<string>('');
+  imageModalTitle = signal<string>('');
 
   // Pagination
   currentPage = signal(1);
@@ -70,12 +80,38 @@ export class TemplatesComponent implements OnInit {
   ngOnInit(): void {
     this.loadTemplates();
     this.setupFilterSubscription();
+    this.setupMessageAutoHide();
   }
 
   private setupFilterSubscription(): void {
-    this.filterForm.valueChanges.subscribe(() => {
+    // Búsqueda en tiempo real con debounce
+    this.filterForm.get('search')?.valueChanges.pipe(
+      debounceTime(300), // Esperar 300ms después del último cambio
+      distinctUntilChanged() // Solo si el valor cambió
+    ).subscribe(() => {
       this.applyFilters();
     });
+
+    // Filtros inmediatos para selects
+    this.filterForm.get('activity_type')?.valueChanges.subscribe(() => {
+      this.applyFilters();
+    });
+
+    this.filterForm.get('status')?.valueChanges.subscribe(() => {
+      this.applyFilters();
+    });
+  }
+
+  private setupMessageAutoHide(): void {
+    // Auto-hide success messages
+    setInterval(() => {
+      if (this.successMessage()) {
+        setTimeout(() => this.successMessage.set(''), 5000);
+      }
+      if (this.errorMessage()) {
+        setTimeout(() => this.errorMessage.set(''), 5000);
+      }
+    }, 100);
   }
 
   loadTemplates(): void {
@@ -145,7 +181,11 @@ export class TemplatesComponent implements OnInit {
       activity_type: 'other',
       status: 'active'
     });
+    this.selectedFile.set(null);
+    this.imagePreview.set(null);
+    this.selectedTemplate.set(null);
     this.showCreateModal.set(true);
+    this.clearMessages();
   }
 
   openEditModal(template: Template): void {
@@ -156,17 +196,22 @@ export class TemplatesComponent implements OnInit {
       activity_type: template.activity_type,
       status: template.status
     });
+    this.selectedFile.set(null);
+    this.imagePreview.set(null);
     this.showEditModal.set(true);
+    this.clearMessages();
   }
 
   openViewModal(template: Template): void {
     this.selectedTemplate.set(template);
     this.showViewModal.set(true);
+    this.clearMessages();
   }
 
   openDeleteModal(template: Template): void {
     this.selectedTemplate.set(template);
     this.showDeleteModal.set(true);
+    this.clearMessages();
   }
 
   closeModals(): void {
@@ -175,18 +220,58 @@ export class TemplatesComponent implements OnInit {
     this.showDeleteModal.set(false);
     this.showViewModal.set(false);
     this.selectedTemplate.set(null);
+    this.selectedFile.set(null);
+    this.imagePreview.set(null);
     this.clearMessages();
+  }
+
+  openImageModal(imageUrl: string, title: string): void {
+    this.imageModalUrl.set(imageUrl);
+    this.imageModalTitle.set(title);
+    this.showImageModal.set(true);
+  }
+
+  closeImageModal(): void {
+    this.showImageModal.set(false);
+    this.imageModalUrl.set('');
+    this.imageModalTitle.set('');
   }
 
   // CRUD operations
   createTemplate(): void {
     if (this.templateForm.invalid) {
       this.markFormGroupTouched();
+      this.errorMessage.set('Por favor completa todos los campos requeridos');
       return;
     }
 
     this.isLoading.set(true);
-    const formData = this.templateForm.value;
+    this.clearMessages();
+
+    const formData = new FormData();
+
+    // Agregar campos del formulario con validación
+    const formValue = this.templateForm.value;
+    console.log('Form values before sending:', formValue);
+    console.log('Form valid:', this.templateForm.valid);
+
+    // Agregar campos manualmente para asegurar que se incluyan
+    formData.append('name', formValue.name || '');
+    formData.append('description', formValue.description || '');
+    formData.append('activity_type', formValue.activity_type || 'other');
+    formData.append('status', formValue.status || 'active');
+
+    // Agregar archivo si existe
+    if (this.selectedFile()) {
+      formData.append('template_file', this.selectedFile()!);
+      console.log('Added file to FormData:', this.selectedFile()!.name);
+    }
+
+    // Debug: mostrar todos los campos del FormData
+    console.log('FormData contents:');
+    formData.forEach((value, key) => {
+      console.log(`${key}: ${value}`);
+    });
 
     this.templateService.createTemplate(formData).subscribe({
       next: (response) => {
@@ -203,6 +288,7 @@ export class TemplatesComponent implements OnInit {
         this.isLoading.set(false);
         this.errorMessage.set('Error al crear plantilla');
         console.error('Error creating template:', error);
+        console.error('Error details:', error.error);
       }
     });
   }
@@ -210,28 +296,67 @@ export class TemplatesComponent implements OnInit {
   updateTemplate(): void {
     if (this.templateForm.invalid || !this.selectedTemplate()) {
       this.markFormGroupTouched();
+      this.errorMessage.set('Por favor completa todos los campos requeridos');
       return;
     }
 
     this.isLoading.set(true);
-    const formData = this.templateForm.value;
+    this.clearMessages();
+
+    const formData = new FormData();
+
+    // Agregar campos del formulario con validación explícita
+    const formValue = this.templateForm.value;
+    console.log('Update form values before sending:', formValue);
+    console.log('Update form valid:', this.templateForm.valid);
+
+    // Agregar campos manualmente para asegurar que se incluyan
+    formData.append('name', formValue.name || '');
+    formData.append('description', formValue.description || '');
+    formData.append('activity_type', formValue.activity_type || 'other');
+    formData.append('status', formValue.status || 'active');
+
+    // Agregar archivo si existe
+    if (this.selectedFile()) {
+      formData.append('template_file', this.selectedFile()!);
+      console.log('Update - Added file to FormData:', this.selectedFile()!.name);
+    }
+
+    // Debug: mostrar todos los campos del FormData
+    console.log('Update FormData contents:');
+    formData.forEach((value, key) => {
+      console.log(`${key}: ${value}`);
+    });
+
     const templateId = this.selectedTemplate()!.id;
+
+    console.log('🚀 Enviando petición de actualización:', {
+      templateId,
+      url: `http://localhost:8000/api/certificate-templates/${templateId}`,
+      method: 'PUT'
+    });
 
     this.templateService.updateTemplate(templateId, formData).subscribe({
       next: (response) => {
+        console.log('✅ Respuesta recibida del servidor:', response);
         this.isLoading.set(false);
         if (response.success) {
           this.successMessage.set('Plantilla actualizada exitosamente');
+          console.log('🔄 Recargando lista de plantillas...');
           this.closeModals();
           this.loadTemplates();
         } else {
+          console.error('❌ Error en la respuesta del servidor:', response.message);
           this.errorMessage.set(response.message || 'Error al actualizar plantilla');
         }
       },
       error: (error) => {
+        console.error('❌ Error en la petición HTTP:', error);
+        console.error('Status:', error.status);
+        console.error('StatusText:', error.statusText);
+        console.error('Error body:', error.error);
         this.isLoading.set(false);
         this.errorMessage.set('Error al actualizar plantilla');
-        console.error('Error updating template:', error);
       }
     });
   }
@@ -240,6 +365,8 @@ export class TemplatesComponent implements OnInit {
     if (!this.selectedTemplate()) return;
 
     this.isLoading.set(true);
+    this.clearMessages();
+
     const templateId = this.selectedTemplate()!.id;
 
     this.templateService.deleteTemplate(templateId).subscribe({
@@ -263,6 +390,7 @@ export class TemplatesComponent implements OnInit {
 
   toggleTemplateStatus(template: Template): void {
     const newStatus = template.status === 'active' ? 'inactive' : 'active';
+    this.clearMessages();
 
     this.templateService.toggleTemplateStatus(template.id, newStatus).subscribe({
       next: (response) => {
@@ -280,30 +408,6 @@ export class TemplatesComponent implements OnInit {
     });
   }
 
-  cloneTemplate(template: Template): void {
-    const newData = {
-      name: `${template.name} (Copia)`,
-      description: template.description,
-      activity_type: template.activity_type,
-      status: 'inactive' as const
-    };
-
-    this.templateService.cloneTemplate(template.id, newData).subscribe({
-      next: (response) => {
-        if (response.success) {
-          this.successMessage.set('Plantilla clonada exitosamente');
-          this.loadTemplates();
-        } else {
-          this.errorMessage.set(response.message || 'Error al clonar plantilla');
-        }
-      },
-      error: (error) => {
-        this.errorMessage.set('Error al clonar plantilla');
-        console.error('Error cloning template:', error);
-      }
-    });
-  }
-
   // Utility methods
   private markFormGroupTouched(): void {
     Object.keys(this.templateForm.controls).forEach(key => {
@@ -316,6 +420,56 @@ export class TemplatesComponent implements OnInit {
   private clearMessages(): void {
     this.errorMessage.set('');
     this.successMessage.set('');
+  }
+
+  // File handling methods
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+
+      // Validar tipo de archivo
+      if (!file.type.startsWith('image/')) {
+        this.errorMessage.set('Por favor selecciona un archivo de imagen válido');
+        return;
+      }
+
+      // Validar tamaño (máximo 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        this.errorMessage.set('El archivo es demasiado grande. Máximo 5MB');
+        return;
+      }
+
+      this.selectedFile.set(file);
+
+      // Crear vista previa
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.imagePreview.set(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+
+      this.clearMessages();
+    }
+  }
+
+  removeImage(): void {
+    this.selectedFile.set(null);
+    this.imagePreview.set(null);
+
+    // Limpiar el input file
+    const fileInputs = document.querySelectorAll('input[type="file"]') as NodeListOf<HTMLInputElement>;
+    fileInputs.forEach(input => {
+      input.value = '';
+    });
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   // Getters for form validation
@@ -362,5 +516,3 @@ export class TemplatesComponent implements OnInit {
     }
   }
 }
-
-
