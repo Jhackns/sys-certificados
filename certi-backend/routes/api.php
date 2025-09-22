@@ -148,6 +148,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // === GESTIÓN DE CERTIFICADOS ===
     Route::prefix('certificates')->middleware('permission:certificates.read')->group(function () {
         Route::get('/', [CertificateController::class, 'index']);
+        Route::get('/my-certificates', [CertificateController::class, 'myCertificates']);
         Route::get('/{id}', [CertificateController::class, 'show']);
         Route::post('/', [CertificateController::class, 'store'])->middleware('permission:certificates.create');
         Route::put('/{id}', [CertificateController::class, 'update'])->middleware('permission:certificates.update');

@@ -571,4 +571,36 @@ class CertificateController extends Controller
             return $this->errorResponse('Error al obtener vista previa: ' . $e->getMessage(), 500);
         }
     }
+
+    /**
+     * Obtener certificados del usuario autenticado
+     *
+     * @return JsonResponse
+     */
+    public function myCertificates(): JsonResponse
+    {
+        try {
+            $userId = Auth::id();
+            
+            if (!$userId) {
+                return $this->errorResponse('Usuario no autenticado', 401);
+            }
+
+            $certificates = Certificate::with(['activity', 'template', 'signer'])
+                ->where('user_id', $userId)
+                ->orderBy('fecha_emision', 'desc')
+                ->get();
+
+            Log::info('Certificados del usuario obtenidos', [
+                'user_id' => $userId,
+                'certificates_count' => $certificates->count()
+            ]);
+
+            return $this->successResponse($certificates, 'Certificados obtenidos correctamente');
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener certificados del usuario: ' . $e->getMessage());
+            return $this->errorResponse('Error al obtener certificados: ' . $e->getMessage(), 500);
+        }
+    }
 }

@@ -47,4 +47,14 @@ export class CertificateService {
   sendEmail(id: number): Observable<any> {
     return this.http.post(`${this.apiUrl}/${id}/send-email`, {});
   }
+
+  // Método para obtener certificados del usuario actual
+  getMyCertificates(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/my-certificates`);
+  }
+
+  // Método para obtener vista previa del certificado
+  getCertificatePreview(id: number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${id}/preview`);
+  }
 }
