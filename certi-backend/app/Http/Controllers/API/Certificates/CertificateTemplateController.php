@@ -256,8 +256,11 @@ class CertificateTemplateController extends Controller
                 'activity_type' => $template->activity_type,
                 'status' => $template->status
             ]);
-            Log::info('Update request data:', $request->all());
-            Log::info('Update request files:', $request->allFiles());
+            Log::info('Update request method:', ['method' => $request->method()]);
+            Log::info('Update request content type:', ['content_type' => $request->header('Content-Type')]);
+            Log::info('Update request raw input:', ['raw_input' => $request->getContent()]);
+            Log::info('Update request data:', ['data' => $request->all()]);
+            Log::info('Update request files:', ['files' => $request->allFiles()]);
 
             $data = $request->validated();
             Log::info('Validated data for update:', $data);

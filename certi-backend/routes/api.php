@@ -138,6 +138,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}/preview', [CertificateTemplateController::class, 'preview'])->middleware('permission:templates.read'); // Para vista previa
         Route::post('/', [CertificateTemplateController::class, 'store']); // Temporalmente sin middleware
         Route::put('/{id}', [CertificateTemplateController::class, 'update'])->middleware('permission:templates.update');
+        Route::post('/{id}', [CertificateTemplateController::class, 'update'])->middleware('permission:templates.update'); // Para FormData con _method
         Route::delete('/{id}', [CertificateTemplateController::class, 'destroy'])->middleware('permission:templates.delete');
 
         // Funcionalidades especiales

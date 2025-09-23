@@ -16,6 +16,10 @@ export interface LoginRequest {
 export interface RegisterRequest {
   name: string;
   email: string;
+  birth_date: string;
+  country: string;
+  gender: string;
+  phone: string;
   password: string;
   password_confirmation?: string;
   role?: string;

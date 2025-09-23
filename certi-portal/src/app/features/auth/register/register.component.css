@@ -2,7 +2,9 @@
 @import '../login/login.component.css';
 
 /* Estilos específicos para el registro */
-.form-group select {
+.form-group select,
+.form-group input[type="date"],
+.form-group input[type="tel"] {
   width: 100%;
   padding: 12px 16px;
   border: 2px solid #e1e5e9;
@@ -13,15 +15,39 @@
   color: #2d3748;
 }
 
-.form-group select:focus {
+.form-group select:focus,
+.form-group input[type="date"]:focus,
+.form-group input[type="tel"]:focus {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-.form-group select.error {
+.form-group select.error,
+.form-group input[type="date"].error,
+.form-group input[type="tel"].error {
   border-color: #e53e3e;
   box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1);
+}
+
+/* Estilos específicos para el campo de fecha */
+.form-group input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.5);
+}
+
+.form-group input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(0.3);
+}
+
+/* Estilos para select con mejor apariencia */
+.form-group select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 40px;
 }
 
 .alert {
@@ -42,4 +68,17 @@
   background-color: #fed7d7;
   color: #742a2a;
   border: 1px solid #feb2b2;
+}
+
+/* Mejoras responsivas para formularios más largos */
+@media (max-width: 768px) {
+  .login-card {
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 20px;
+  }
+  
+  .form-group {
+    margin-bottom: 16px;
+  }
 }

@@ -26,6 +26,10 @@ export class RegisterComponent {
     this.registerForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(2)]],
       email: ['', [Validators.required, Validators.email]],
+      birth_date: ['', [Validators.required]],
+      country: ['', [Validators.required]],
+      gender: ['', [Validators.required]],
+      phone: ['', [Validators.required, Validators.pattern(/^[0-9+\-\s()]+$/)]],
       password: ['', [Validators.required, Validators.minLength(8)]],
       password_confirmation: ['', [Validators.required]],
       role: ['usuario_final', [Validators.required]]
@@ -57,6 +61,10 @@ export class RegisterComponent {
       const registerData: RegisterRequest = {
         name: this.registerForm.value.name,
         email: this.registerForm.value.email,
+        birth_date: this.registerForm.value.birth_date,
+        country: this.registerForm.value.country,
+        gender: this.registerForm.value.gender,
+        phone: this.registerForm.value.phone,
         password: this.registerForm.value.password,
         password_confirmation: this.registerForm.value.password_confirmation,
         role: this.registerForm.value.role
@@ -96,10 +104,26 @@ export class RegisterComponent {
     const field = this.registerForm.get(fieldName);
     if (field?.errors && field.touched) {
       if (field.errors['required']) {
-        return `${fieldName} es requerido`;
+        const fieldLabels: { [key: string]: string } = {
+          'name': 'Nombre completo',
+          'email': 'Correo electrónico',
+          'birth_date': 'Fecha de nacimiento',
+          'country': 'País',
+          'gender': 'Género',
+          'phone': 'Teléfono',
+          'password': 'Contraseña',
+          'password_confirmation': 'Confirmación de contraseña'
+        };
+        return `${fieldLabels[fieldName] || fieldName} es requerido`;
       }
       if (field.errors['email']) {
         return 'Email inválido';
+      }
+      if (field.errors['pattern']) {
+        if (fieldName === 'phone') {
+          return 'Formato de teléfono inválido';
+        }
+        return 'Formato inválido';
       }
       if (field.errors['minlength']) {
         if (fieldName === 'password') {

@@ -18,6 +18,9 @@ return new class extends Migration
             $table->string('file_path')->nullable();
             $table->enum('activity_type', ['course', 'event', 'other'])->default('other');
             $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->boolean('is_active')->default(true);
+            $table->json('coordinates_x')->nullable()->comment('X coordinates for text positioning (signature, QR, etc.)');
+            $table->json('coordinates_y')->nullable()->comment('Y coordinates for text positioning (signature, QR, etc.)');
             $table->timestamps();
         });
     }

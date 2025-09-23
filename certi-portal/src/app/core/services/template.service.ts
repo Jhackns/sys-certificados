@@ -69,6 +69,10 @@ export class TemplateService {
   }
 
   updateTemplate(id: number, data: FormData | Partial<Template>): Observable<ApiResponse<{ template: Template }>> {
+    // Si es FormData, usar POST con _method override para manejar archivos correctamente
+    if (data instanceof FormData) {
+      return this.http.post<ApiResponse<{ template: Template }>>(`${this.apiUrl}/${id}`, data);
+    }
     return this.http.put<ApiResponse<{ template: Template }>>(`${this.apiUrl}/${id}`, data);
   }
 

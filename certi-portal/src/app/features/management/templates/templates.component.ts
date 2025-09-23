@@ -260,6 +260,8 @@ export class TemplatesComponent implements OnInit {
     formData.append('description', formValue.description || '');
     formData.append('activity_type', formValue.activity_type || 'other');
     formData.append('status', formValue.status || 'active');
+    
+    // NO agregar _method para creación - solo se usa en actualizaciones
 
     // Agregar archivo si existe
     if (this.selectedFile()) {
