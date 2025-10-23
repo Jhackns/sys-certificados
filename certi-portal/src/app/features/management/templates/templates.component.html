@@ -116,8 +116,7 @@
                   [src]="template.file_url"
                   [alt]="template.name"
                   class="preview-thumbnail"
-                  (click)="openImageModal(template.file_url, template.name)"
-                  title="Click para ver en grande"
+                  title="Vista previa"
                 >
                 <div *ngIf="!template.file_url" class="no-preview">
                   <i class="fas fa-image"></i>
@@ -145,33 +144,18 @@
             <td>
               <div class="action-buttons">
                 <button
-                  class="btn-icon btn-view"
-                  (click)="openViewModal(template)"
-                  title="Ver detalles"
-                >
-                  <i class="fas fa-eye"></i>
-                </button>
-                <button
-                  class="btn-icon btn-edit"
+                  class="btn btn-sm btn-outline-secondary"
                   (click)="openEditModal(template)"
-                  title="Editar"
+                  title="Editar plantilla"
                 >
                   <i class="fas fa-edit"></i>
                 </button>
                 <button
-                  class="btn-icon btn-toggle"
-                  (click)="toggleTemplateStatus(template)"
-                  [title]="template.status === 'active' ? 'Desactivar' : 'Activar'"
-                  [class]="template.status === 'active' ? 'btn-deactivate' : 'btn-activate'"
-                >
-                  <i class="fas" [class]="template.status === 'active' ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
-                </button>
-                <button
-                  class="btn-icon btn-delete"
+                  class="btn btn-sm btn-outline-danger"
                   (click)="openDeleteModal(template)"
-                  title="Eliminar"
+                  title="Eliminar plantilla"
                 >
-                  <i class="fas fa-trash-alt"></i>
+                  <i class="fas fa-trash"></i>
                 </button>
               </div>
             </td>
@@ -217,31 +201,7 @@
   </div>
 </div>
 
-<!-- Modal para mostrar imagen en grande -->
-<div class="modal-overlay" *ngIf="showImageModal()" (click)="closeImageModal()">
-  <div class="modal-dialog modal-image" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h3>{{ imageModalTitle() }}</h3>
-      <button class="btn-close" (click)="closeImageModal()">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
 
-    <div class="modal-body modal-image-body">
-      <img
-        [src]="imageModalUrl()"
-        [alt]="imageModalTitle()"
-        class="full-size-image"
-      >
-    </div>
-
-    <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" (click)="closeImageModal()">
-        Cerrar
-      </button>
-    </div>
-  </div>
-</div>
 
 <!-- Modal para crear plantilla -->
 <div class="modal-overlay" *ngIf="showCreateModal()" (click)="closeModals()">
@@ -298,47 +258,29 @@
         </div>
 
         <div class="form-group">
-          <label>Imagen de Plantilla</label>
-          <div class="file-upload-container">
+          <label>Enlace de Diseño de Canva *</label>
+          <div class="canva-link-container">
             <input
-              type="file"
-              #fileInputCreate
-              accept="image/*"
-              (change)="onFileSelected($event)"
-              class="file-input"
-              id="template-file-create"
+              class="form-control"
+              type="text"
+              formControlName="canva_design_id"
+              placeholder="Ej: https://www.canva.com/design/DAEX..."
+              (blur)="validateCanvaLink()"
             >
-            <label for="template-file-create" class="file-upload-label">
-              <i class="fas fa-cloud-upload-alt"></i>
-              <span>{{ selectedFile() ? selectedFile()!.name : 'Seleccionar imagen de plantilla' }}</span>
-            </label>
-            <div class="file-info" *ngIf="selectedFile()">
-              <small class="text-muted">
-                Tamaño: {{ formatFileSize(selectedFile()!.size) }}
-              </small>
+            <div class="canva-validation-indicator" *ngIf="canvaLinkValidated()">
+              <i class="fas" [ngClass]="canvaLinkValid() ? 'fa-check-circle text-success' : 'fa-times-circle text-danger'"></i>
+              <span [ngClass]="canvaLinkValid() ? 'text-success' : 'text-danger'">
+                {{ canvaLinkValid() ? 'Enlace validado' : 'Enlace incorrecto, intente otra vez' }}
+              </span>
             </div>
+            <div class="error-message" *ngIf="templateForm.get('canva_design_id')?.touched && templateForm.get('canva_design_id')?.errors">
+              <span *ngIf="templateForm.get('canva_design_id')?.errors?.['required']">El enlace de diseño de Canva es requerido</span>
+            </div>
+            <small class="form-text text-muted">Ingrese el enlace completo del diseño creado en Canva para generar certificados automáticamente.</small>
           </div>
         </div>
 
-        <!-- Vista previa de la imagen nueva -->
-        <div class="form-group" *ngIf="imagePreview()">
-          <label>Vista Previa</label>
-          <div class="image-preview-container">
-            <img
-              [src]="imagePreview()"
-              alt="Vista previa"
-              class="template-preview-image"
-            >
-            <button
-              type="button"
-              class="btn-remove-image"
-              (click)="removeImage()"
-              title="Remover imagen"
-            >
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-        </div>
+
       </div>
 
       <div class="modal-footer">
@@ -413,46 +355,34 @@
         </div>
 
         <div class="form-group">
-          <label>Cambiar Imagen de Plantilla</label>
-          <div class="file-upload-container">
+          <label>Cambiar Diseño de Canva</label>
+          <div class="canva-link-container">
             <input
-              type="file"
-              #fileInputEdit
-              accept="image/*"
-              (change)="onFileSelected($event)"
-              class="file-input"
-              id="template-file-edit"
+              class="form-control"
+              type="text"
+              formControlName="canva_design_id"
+              placeholder="Ej: https://www.canva.com/design/DAEX... o ID directo"
+              (blur)="validateCanvaLink()"
             >
-            <label for="template-file-edit" class="file-upload-label">
-              <i class="fas fa-cloud-upload-alt"></i>
-              <span>{{ selectedFile() ? selectedFile()!.name : 'Seleccionar nueva imagen de plantilla' }}</span>
-            </label>
-            <div class="file-info" *ngIf="selectedFile()">
-              <small class="text-muted">
-                Tamaño: {{ formatFileSize(selectedFile()!.size) }}
-              </small>
+            <div class="canva-validation-indicator" *ngIf="canvaLinkValidated()">
+              <i class="fas" [ngClass]="canvaLinkValid() ? 'fa-check-circle text-success' : 'fa-times-circle text-danger'"></i>
+              <span [ngClass]="canvaLinkValid() ? 'text-success' : 'text-danger'">
+                {{ canvaLinkValid() ? 'Diseño válido' : 'Diseño inválido, intente otra vez' }}
+              </span>
             </div>
+            <div class="error-message" *ngIf="templateForm.get('canva_design_id')?.touched && templateForm.get('canva_design_id')?.errors">
+              <span *ngIf="templateForm.get('canva_design_id')?.errors?.['required']">El enlace de diseño de Canva es requerido</span>
+            </div>
+            <small class="form-text text-muted">Ingrese el enlace completo del diseño creado en Canva o el ID directo del diseño.</small>
           </div>
         </div>
 
-        <!-- Vista previa de la imagen actual o nueva -->
-        <div class="form-group" *ngIf="imagePreview() || selectedTemplate()?.file_url">
-          <label>Vista Previa</label>
-          <div class="image-preview-container">
-            <img
-              [src]="imagePreview() || selectedTemplate()?.file_url"
-              alt="Vista previa"
-              class="template-preview-image"
-            >
-            <button
-              type="button"
-              class="btn-remove-image"
-              (click)="removeImage()"
-              title="Remover imagen"
-              *ngIf="imagePreview()"
-            >
-              <i class="fas fa-times"></i>
-            </button>
+        <!-- Vista previa del diseño actual -->
+        <div class="form-group" *ngIf="selectedTemplate()?.canva_design_id">
+          <label>Diseño Actual</label>
+          <div class="current-design-info">
+            <p><strong>ID del diseño:</strong> {{ selectedTemplate()?.canva_design_id }}</p>
+            <p><strong>Enlace de Canva:</strong> <a [href]="'https://www.canva.com/design/' + selectedTemplate()?.canva_design_id + '/view'" target="_blank" rel="noopener noreferrer">Ver diseño en Canva</a></p>
           </div>
         </div>
       </div>
@@ -508,6 +438,8 @@
     </div>
   </div>
 </div>
+
+
 
 <!-- Modal para ver detalles -->
 <div class="modal-overlay" *ngIf="showViewModal()" (click)="closeModals()">
@@ -566,13 +498,12 @@
             <h4><i class="fas fa-image"></i> Vista Previa</h4>
             <div class="enhanced-preview-container">
               <div class="preview-wrapper">
-                <img
-                  [src]="selectedTemplate()?.file_url"
-                  [alt]="selectedTemplate()?.name"
-                  class="enhanced-preview-image"
-                  (click)="openImageModal(selectedTemplate()?.file_url || '', selectedTemplate()?.name || '')"
-                  title="Click para ver en grande"
-                >
+                <app-template-preview
+                  [template]="selectedTemplate()"
+                  [showElements]="true"
+                  [sampleUserName]="'Juan Pérez'"
+                  title="Vista previa de la plantilla"
+                ></app-template-preview>
                 <div class="preview-overlay">
                   <i class="fas fa-search-plus"></i>
                   <span>Click para ampliar</span>

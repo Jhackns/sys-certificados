@@ -9,8 +9,11 @@ export interface Template {
   description?: string;
   file_path?: string;
   file_url?: string;
+  canva_design_id?: string;
   activity_type: 'course' | 'event' | 'other';
   status: 'active' | 'inactive';
+  qr_position?: any;
+  name_position?: any;
   created_at: string;
   updated_at: string;
   certificates_count?: number;
@@ -96,5 +99,17 @@ export class TemplateService {
 
   getTemplatesList(): Observable<ApiResponse<{ templates: { id: number; name: string; description?: string }[] }>> {
     return this.http.get<ApiResponse<{ templates: { id: number; name: string; description?: string }[] }>>(`${this.apiUrl}/list`);
+  }
+
+  updateTemplatePositions(id: number, positions: {
+    qr_position?: any;
+    name_position?: any;
+    background_image_size?: any;
+  }): Observable<ApiResponse<{ template: Template }>> {
+    return this.http.put<ApiResponse<{ template: Template }>>(`${this.apiUrl}/${id}/positions`, positions);
+  }
+  
+  validateCanvaDesign(designId: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/canva/validate-design`, { canva_design_id: designId });
   }
 }

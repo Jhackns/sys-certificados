@@ -13,12 +13,15 @@ class Validation extends Model
     protected $fillable = [
         'certificate_id',
         'user_id',
-        'validated_at',
-        'ip_address',
+        'validation_code',
+        'validation_date',
+        'validator_ip',
+        'validator_user_agent',
+        'notes',
     ];
 
     protected $casts = [
-        'validated_at' => 'datetime',
+        'validation_date' => 'datetime',
     ];
 
     /**

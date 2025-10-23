@@ -34,5 +34,10 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    
+    'canva' => [
+        'client_id' => env('CANVA_CLIENT_ID'),
+        'client_secret' => env('CANVA_CLIENT_SECRET'),
+    ],
 
 ];

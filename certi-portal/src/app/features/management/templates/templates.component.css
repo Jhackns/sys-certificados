@@ -617,6 +617,34 @@
   gap: 16px;
 }
 
+/* Estilos para la validación del enlace de Canva */
+.canva-link-container {
+  position: relative;
+}
+
+.canva-validation-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.text-success {
+  color: #10b981;
+}
+
+.text-danger {
+  color: #ef4444;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .form-group label {
   display: block;
   margin-bottom: 6px;
@@ -1004,6 +1032,39 @@ textarea.form-control {
 .btn-remove-image:hover {
   background-color: #dc2626;
   transform: scale(1.1);
+}
+
+/* Estilos para el botón del editor de posiciones */
+.position-editor-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.btn-position-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.btn-position-editor:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.position-editor-section small {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
 }
 
 /* Responsive */

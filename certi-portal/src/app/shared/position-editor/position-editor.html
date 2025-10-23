@@ -1,0 +1,122 @@
+<div class="position-editor-modal">
+  <div class="modal-overlay" (click)="cancelEdit()"></div>
+  
+  <div class="modal-content">
+    <!-- Header -->
+    <div class="modal-header">
+      <h3><i class="fas fa-edit"></i> Editor de Posiciones</h3>
+      <button class="btn-close" (click)="cancelEdit()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="tool-group">
+        <h4>Elementos</h4>
+        <button 
+          class="btn btn-tool" 
+          [class.active]="selectedTool() === 'qr'"
+          (click)="selectTool('qr')"
+        >
+          <i class="fas fa-qrcode"></i>
+          Código QR
+        </button>
+        <button 
+          class="btn btn-tool" 
+          [class.active]="selectedTool() === 'name'"
+          (click)="selectTool('name')"
+        >
+          <i class="fas fa-font"></i>
+          Nombre Usuario
+        </button>
+      </div>
+
+      <div class="tool-group" *ngIf="nameElement">
+        <h4>Configuración de Texto</h4>
+        <div class="font-controls">
+          <label>Tamaño:</label>
+          <select (change)="changeFontSize(+$any($event.target).value)" class="form-control-sm">
+            <option value="16">16px</option>
+            <option value="18">18px</option>
+            <option value="20">20px</option>
+            <option value="24" selected>24px</option>
+            <option value="28">28px</option>
+            <option value="32">32px</option>
+            <option value="36">36px</option>
+            <option value="48">48px</option>
+          </select>
+          
+          <label>Fuente:</label>
+          <select (change)="changeFontFamily($any($event.target).value)" class="form-control-sm">
+            <option value="Arial" selected>Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Helvetica">Helvetica</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Verdana">Verdana</option>
+            <option value="Courier New">Courier New</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="tool-group">
+        <h4>Acciones</h4>
+        <button 
+          class="btn btn-danger btn-sm" 
+          (click)="removeQRElement()"
+          *ngIf="qrElement"
+        >
+          <i class="fas fa-trash"></i>
+          Quitar QR
+        </button>
+        <button 
+          class="btn btn-danger btn-sm" 
+          (click)="removeNameElement()"
+          *ngIf="nameElement"
+        >
+          <i class="fas fa-trash"></i>
+          Quitar Nombre
+        </button>
+      </div>
+    </div>
+
+    <!-- Canvas Container -->
+    <div class="canvas-container">
+      <div class="canvas-wrapper">
+        <canvas #canvasElement></canvas>
+        <div class="loading-overlay" *ngIf="isLoading()">
+          <i class="fas fa-spinner fa-spin"></i>
+          <p>Cargando editor...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions">
+      <div class="instruction-item">
+        <i class="fas fa-info-circle"></i>
+        <span>Haz clic en "Código QR" o "Nombre Usuario" para agregar elementos</span>
+      </div>
+      <div class="instruction-item">
+        <i class="fas fa-mouse-pointer"></i>
+        <span>Arrastra los elementos para posicionarlos</span>
+      </div>
+      <div class="instruction-item">
+        <i class="fas fa-expand-arrows-alt"></i>
+        <span>Usa las esquinas para redimensionar</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-footer">
+      <button class="btn btn-outline" (click)="cancelEdit()">
+        <i class="fas fa-times"></i>
+        Cancelar
+      </button>
+      <button class="btn btn-primary" (click)="savePositions()">
+        <i class="fas fa-save"></i>
+        Guardar Posiciones
+      </button>
+    </div>
+  </div>
+</div>

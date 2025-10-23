@@ -169,21 +169,21 @@
   <!-- Paginación -->
   <div class="pagination-container" *ngIf="!isLoading() && totalPages() > 1">
     <nav class="pagination-nav">
-      <button 
-        class="pagination-btn" 
+      <button
+        class="pagination-btn"
         [disabled]="currentPage() === 1"
         (click)="goToPage(currentPage() - 1)"
       >
         <i class="fas fa-chevron-left"></i>
         Anterior
       </button>
-      
+
       <div class="pagination-info">
         Página {{ currentPage() }} de {{ totalPages() }}
       </div>
-      
-      <button 
-        class="pagination-btn" 
+
+      <button
+        class="pagination-btn"
         [disabled]="currentPage() === totalPages()"
         (click)="goToPage(currentPage() + 1)"
       >
@@ -196,10 +196,10 @@
 
 <!-- Modal Crear -->
 <div class="modal-overlay" *ngIf="showCreateModal()" (click)="closeModals()">
-  <div class="modal-dialog modal-responsive" (click)="$event.stopPropagation()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>
-        <i class="fas fa-plus-circle"></i>
+        <i class="fas fa-plus"></i>
         Nuevo Certificado
       </h3>
       <button class="btn-close" (click)="closeModals()">
@@ -217,10 +217,10 @@
           <div class="form-grid">
             <div class="form-group full-width">
               <label>Nombre del certificado <span class="required">*</span></label>
-              <input 
-                class="form-control" 
-                type="text" 
-                formControlName="nombre" 
+              <input
+                class="form-control"
+                type="text"
+                formControlName="nombre"
                 placeholder="Certificado de Participación"
                 [class.invalid]="createForm.get('nombre')?.invalid && createForm.get('nombre')?.touched"
               />
@@ -228,11 +228,11 @@
                 <span *ngIf="createForm.get('nombre')?.errors?.['required']">El nombre es requerido</span>
               </div>
             </div>
-            
+
             <div class="form-group">
               <label>Usuario <span class="required">*</span></label>
-              <select 
-                class="form-control" 
+              <select
+                class="form-control"
                 formControlName="user_id"
                 [class.invalid]="createForm.get('user_id')?.invalid && createForm.get('user_id')?.touched"
               >
@@ -243,11 +243,11 @@
                 <span *ngIf="createForm.get('user_id')?.errors?.['required']">El usuario es requerido</span>
               </div>
             </div>
-            
+
             <div class="form-group">
               <label>Actividad <span class="required">*</span></label>
-              <select 
-                class="form-control" 
+              <select
+                class="form-control"
                 formControlName="activity_id"
                 [class.invalid]="createForm.get('activity_id')?.invalid && createForm.get('activity_id')?.touched"
               >
@@ -257,16 +257,6 @@
               <div class="error-message" *ngIf="createForm.get('activity_id')?.invalid && createForm.get('activity_id')?.touched">
                 <span *ngIf="createForm.get('activity_id')?.errors?.['required']">La actividad es requerida</span>
               </div>
-            </div>
-            
-            <div class="form-group full-width">
-              <label>Descripción (opcional)</label>
-              <textarea 
-                class="form-control" 
-                formControlName="descripcion" 
-                placeholder="Descripción del certificado" 
-                rows="3"
-              ></textarea>
             </div>
           </div>
         </div>
@@ -279,9 +269,9 @@
           <div class="form-grid">
             <div class="form-group">
               <label>Plantilla <span class="required">*</span></label>
-              <select 
-                class="form-control" 
-                formControlName="id_template" 
+              <select
+                class="form-control"
+                formControlName="id_template"
                 (change)="onTemplateChange($any($event.target).value)"
                 [class.invalid]="createForm.get('id_template')?.invalid && createForm.get('id_template')?.touched"
               >
@@ -292,7 +282,7 @@
                 <span *ngIf="createForm.get('id_template')?.errors?.['required']">La plantilla es requerida</span>
               </div>
             </div>
-            
+
             <div class="form-group">
               <label>Estado</label>
               <select class="form-control" formControlName="status">
@@ -302,76 +292,158 @@
                 <option value="expired">Expirado</option>
               </select>
             </div>
-            
+
             <div class="form-group">
-              <label>Fecha de emisión <span class="required">*</span></label>
-              <input 
-                class="form-control" 
-                type="date" 
+              <label>Fecha de Emisión</label>
+              <input
+                class="form-control"
+                type="date"
                 formControlName="fecha_emision"
-                [class.invalid]="createForm.get('fecha_emision')?.invalid && createForm.get('fecha_emision')?.touched"
+                [value]="todayDate"
               />
-              <div class="error-message" *ngIf="createForm.get('fecha_emision')?.invalid && createForm.get('fecha_emision')?.touched">
-                <span *ngIf="createForm.get('fecha_emision')?.errors?.['required']">La fecha de emisión es requerida</span>
-              </div>
             </div>
-            
+
             <div class="form-group">
-              <label>Fecha de vencimiento (opcional)</label>
-              <input class="form-control" type="date" formControlName="fecha_vencimiento" />
-            </div>
-            
-            <div class="form-group full-width">
-              <label>Firmado por (opcional)</label>
-              <select class="form-control" formControlName="signed_by">
-                <option value="">Sin firmar</option>
-                <option *ngFor="let user of users()" [value]="user.id">{{ user.name }}</option>
-              </select>
+              <label>Fecha de Vencimiento</label>
+              <input
+                class="form-control"
+                type="date"
+                formControlName="fecha_vencimiento"
+              />
             </div>
           </div>
         </div>
 
-        <!-- Vista previa de plantilla -->
-        <div class="form-section" *ngIf="selectedTemplate()">
+        <!-- Descripción -->
+        <div class="form-section">
           <div class="form-section-header">
-            <h4><i class="fas fa-eye"></i> Vista Previa de Plantilla</h4>
+            <h4><i class="fas fa-align-left"></i> Descripción</h4>
           </div>
-          <div class="template-preview-section">
-            <div class="template-info">
-              <div class="template-details">
-                <h5>{{ selectedTemplate()?.name }}</h5>
-                <p *ngIf="selectedTemplate()?.description">{{ selectedTemplate()?.description }}</p>
-                <span class="template-stats">
-                  <i class="fas fa-certificate"></i>
-                  {{ selectedTemplate()?.certificates_count || 0 }} certificados generados
-                </span>
-              </div>
+          <div class="form-group">
+            <label>Descripción del certificado</label>
+            <textarea
+              class="form-control"
+              formControlName="descripcion"
+              rows="3"
+              placeholder="Descripción detallada del certificado..."
+            ></textarea>
+          </div>
+        </div>
+
+        <!-- Vista previa de plantilla -->
+        <div class="template-preview-container" *ngIf="selectedTemplate()">
+          <div class="template-preview-header">
+            <h5><i class="fas fa-eye"></i> Vista Previa de Plantilla</h5>
+            <span class="badge" [class]="getStatusBadgeClass(selectedTemplate()!.status)">
+              {{ getStatusLabel(selectedTemplate()!.status) }}
+            </span>
+          </div>
+
+          <div class="template-preview-content">
+            <div class="template-preview-info">
+              <p><strong>Plantilla:</strong> {{ selectedTemplate()!.name }}</p>
+              <p><strong>Tipo:</strong> {{ getActivityTypeLabel(selectedTemplate()!.activity_type) }}</p>
+              <p><strong>Descripción:</strong> {{ selectedTemplate()!.description || 'Sin descripción' }}</p>
             </div>
-            <div class="preview-image" *ngIf="templatePreview(); else noPreview">
-              <img [src]="templatePreview()" [alt]="selectedTemplate()?.name" class="template-img" />
-            </div>
-            <ng-template #noPreview>
-              <div class="no-preview">
-                <i class="fas fa-file-image"></i>
-                <p>Vista previa no disponible</p>
-              </div>
-            </ng-template>
           </div>
         </div>
       </div>
 
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline" (click)="closeModals()">
-          <i class="fas fa-times"></i>
-          Cancelar
-        </button>
-        <button type="submit" class="btn btn-primary" [disabled]="createForm.invalid || isLoading()">
-          <i class="fas fa-plus" *ngIf="!isLoading()"></i>
-          <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
+        <button type="button" class="btn btn-outline" (click)="closeModals()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" [disabled]="isLoading()">
+          <i class="fas fa-save"></i>
           {{ isLoading() ? 'Creando...' : 'Crear Certificado' }}
         </button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Modal Editar -->
+<div class="modal-overlay" *ngIf="showEditModal()" (click)="closeModals()">
+  <div class="modal-dialog modal-lg" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>
+        <i class="fas fa-edit"></i>
+        Editar Certificado
+      </h3>
+      <button class="btn-close" (click)="closeModals()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="modal-body" *ngIf="selectedCertificate()">
+      <div class="form-section">
+        <div class="form-section-header">
+          <h4><i class="fas fa-info-circle"></i> Información del Certificado</h4>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nombre del certificado</label>
+            <p class="form-control-static">{{ selectedCertificate()!.nombre }}</p>
+          </div>
+
+          <div class="form-group">
+            <label>Usuario</label>
+            <p class="form-control-static">{{ selectedCertificate()!.user?.name }} ({{ selectedCertificate()!.user?.email }})</p>
+          </div>
+
+          <div class="form-group">
+            <label>Actividad</label>
+            <p class="form-control-static">{{ selectedCertificate()!.activity?.name }}</p>
+          </div>
+
+          <div class="form-group">
+            <label>Descripción</label>
+            <p class="form-control-static">{{ selectedCertificate()!.descripcion || 'Sin descripción' }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-header">
+          <h4><i class="fas fa-file-alt"></i> Detalles del Certificado</h4>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Plantilla</label>
+            <p class="form-control-static">{{ selectedCertificate()!.template?.name }}</p>
+          </div>
+
+          <div class="form-group">
+            <label>Estado</label>
+            <span class="badge" [class]="getStatusBadgeClass(selectedCertificate()!.status)">
+              {{ getStatusLabel(selectedCertificate()!.status) }}
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label>Código único</label>
+            <p class="form-control-static">{{ selectedCertificate()!.unique_code }}</p>
+          </div>
+
+          <div class="form-group">
+            <label>Fecha de emisión</label>
+            <p class="form-control-static">{{ selectedCertificate()!.fecha_emision | date:'dd/MM/yyyy' }}</p>
+          </div>
+
+          <div class="form-group" *ngIf="selectedCertificate()!.fecha_vencimiento">
+            <label>Fecha de vencimiento</label>
+            <p class="form-control-static">{{ selectedCertificate()!.fecha_vencimiento | date:'dd/MM/yyyy' }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" (click)="closeModals()">Cerrar</button>
+      <button type="button" class="btn btn-primary" (click)="openDownloadModal(selectedCertificate()!)">
+        <i class="fas fa-download"></i> Descargar
+      </button>
+    </div>
   </div>
 </div>
 
@@ -534,11 +606,11 @@
         <strong>{{ selectedCertificate()?.nombre }}</strong><br>
         <small>{{ selectedCertificate()?.user?.name }}</small>
       </div>
-      
+
       <div class="download-options">
-        <button 
-          type="button" 
-          class="btn btn-download-pdf" 
+        <button
+          type="button"
+          class="btn btn-download-pdf"
           (click)="downloadCertificateFormat('pdf')"
           [disabled]="isLoading()"
         >
@@ -546,10 +618,10 @@
           <span>Descargar PDF</span>
           <small>Formato estándar para impresión</small>
         </button>
-        
-        <button 
-          type="button" 
-          class="btn btn-download-jpg" 
+
+        <button
+          type="button"
+          class="btn btn-download-jpg"
           (click)="downloadCertificateFormat('jpg')"
           [disabled]="isLoading()"
         >
@@ -558,7 +630,7 @@
           <small>Formato de imagen para compartir</small>
         </button>
       </div>
-      
+
       <div class="loading-message" *ngIf="isLoading()">
         <i class="fas fa-spinner fa-spin"></i>
         Preparando descarga...

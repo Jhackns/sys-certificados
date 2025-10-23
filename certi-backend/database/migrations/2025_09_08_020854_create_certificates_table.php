@@ -21,6 +21,18 @@ return new class extends Migration
             $table->text('descripcion')->nullable();
             $table->string('unique_code')->unique();
             $table->text('qr_url')->nullable();
+
+            // Campos de verificación y QR
+            $table->string('verification_code')->nullable()->unique();
+            $table->string('verification_token')->nullable();
+            $table->text('verification_url')->nullable();
+            $table->string('qr_image_path')->nullable();
+            
+            $table->string('final_image_path')->nullable();
+            $table->json('validation_data')->nullable();
+            $table->integer('verification_count')->default(0);
+            $table->timestamp('last_verified_at')->nullable();
+
             $table->date('fecha_emision');
             $table->date('fecha_vencimiento')->nullable();
             $table->timestamp('issued_at');

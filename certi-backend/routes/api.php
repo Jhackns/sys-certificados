@@ -144,6 +144,15 @@ Route::middleware('auth:sanctum')->group(function () {
         // Funcionalidades especiales
         Route::patch('/{id}/toggle-status', [CertificateTemplateController::class, 'toggleStatus'])->middleware('permission:templates.update');
         Route::post('/{id}/clone', [CertificateTemplateController::class, 'clone'])->middleware('permission:templates.create');
+        Route::put('/{id}/positions', [CertificateTemplateController::class, 'updatePositions'])->middleware('permission:templates.update');
+
+        // Validación de diseños de Canva
+        Route::post('/validate-canva-design', [CertificateTemplateController::class, 'validateCanvaDesign']);
+    });
+
+    // Ruta adicional para compatibilidad con frontend
+    Route::prefix('canva')->group(function () {
+        Route::post('/validate-design', [CertificateTemplateController::class, 'validateCanvaDesign']);
     });
 
     // === GESTIÓN DE CERTIFICADOS ===

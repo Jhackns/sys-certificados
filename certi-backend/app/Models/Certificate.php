@@ -19,7 +19,15 @@ class Certificate extends Model
         'nombre',
         'descripcion',
         'unique_code',
+        'verification_code',
+        'verification_token',
+        'verification_url',
         'qr_url',
+        'qr_image_path',
+        'final_image_path',
+        'validation_data',
+        'verification_count',
+        'last_verified_at',
         'fecha_emision',
         'fecha_vencimiento',
         'issued_at',
@@ -30,6 +38,8 @@ class Certificate extends Model
         'issued_at' => 'datetime',
         'fecha_emision' => 'date',
         'fecha_vencimiento' => 'date',
+        'last_verified_at' => 'datetime',
+        'validation_data' => 'array',
     ];
 
     /**
@@ -94,5 +104,77 @@ class Certificate extends Model
     public function scopeByCode($query, $code)
     {
         return $query->where('unique_code', $code);
+    }
+
+    /**
+     * Scope para certificados por código de verificación
+     */
+    public function scopeByVerificationCode($query, $code)
+    {
+        return $query->where('verification_code', $code);
+    }
+
+    /**
+     * Scope para certificados por token de verificación
+     */
+    public function scopeByVerificationToken($query, $token)
+    {
+        return $query->where('verification_token', $token);
+    }
+
+    /**
+     * Generar código de verificación mixto
+     */
+    public function generateVerificationCode(): string
+    {
+        $prefix = 'CERT' . str_pad($this->id, 3, '0', STR_PAD_LEFT);
+        $token = substr(bin2hex(random_bytes(8)), 0, 12);
+        return $prefix . '-' . $token;
+    }
+
+    /**
+     * Generar token de verificación seguro
+     */
+    public function generateVerificationToken(): string
+    {
+        return bin2hex(random_bytes(32));
+    }
+
+    /**
+     * Obtener URL de verificación completa
+     */
+    public function getVerificationUrl(): string
+    {
+        $baseUrl = config('app.url');
+        return $baseUrl . '/verify/' . $this->verification_code;
+    }
+
+    /**
+     * Verificar si el certificado está válido
+     */
+    public function isValid(): bool
+    {
+        if ($this->status === 'revoked' || $this->status === 'cancelled') {
+            return false;
+        }
+
+        if ($this->status === 'expired') {
+            return false;
+        }
+
+        if ($this->fecha_vencimiento && $this->fecha_vencimiento->isPast()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Incrementar contador de verificaciones
+     */
+    public function incrementVerificationCount(): void
+    {
+        $this->increment('verification_count');
+        $this->update(['last_verified_at' => now()]);
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CertificateVerificationController;
 
 Route::get('/', function () {
     return response()->json([
@@ -10,7 +11,8 @@ Route::get('/', function () {
             'login' => '/api/auth/login',
             'register' => '/api/auth/register',
             'public_companies' => '/api/public/companies',
-            'validate_certificate' => '/api/public/validate-certificate'
+            'validate_certificate' => '/api/public/validate-certificate',
+            'verify_certificate' => '/verify/{code}'
         ]
     ]);
 });
@@ -23,3 +25,18 @@ Route::get('/login', function () {
         'login_endpoint' => '/api/auth/login'
     ], 401);
 })->name('login');
+
+// Rutas públicas de verificación de certificados
+Route::prefix('verify')->group(function () {
+    Route::get('/{verificationCode}', [CertificateVerificationController::class, 'show'])
+        ->name('certificate.verify.show');
+    
+    Route::get('/{verificationCode}/download', [CertificateVerificationController::class, 'downloadPdf'])
+        ->name('certificate.verify.download');
+});
+
+// API de verificación
+Route::prefix('api/verify')->group(function () {
+    Route::get('/{verificationCode}', [CertificateVerificationController::class, 'verify'])
+        ->name('api.certificate.verify');
+});

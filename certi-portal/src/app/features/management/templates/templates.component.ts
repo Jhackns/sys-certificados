@@ -3,45 +3,43 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { TemplateService, Template, TemplateFilters } from '../../../core/services/template.service';
+import { TemplatePreviewComponent } from '../../../shared/template-preview/template-preview.component';
+import { ApiResponse } from '../../../core/models/api-response.model';
 
 @Component({
   selector: 'app-templates',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, TemplatePreviewComponent],
   templateUrl: './templates.component.html',
-  styleUrl: './templates.component.css'
+  styleUrls: ['./templates.component.css']
 })
 export class TemplatesComponent implements OnInit {
   templates = signal<Template[]>([]);
-  filteredTemplates = signal<Template[]>([]);
   isLoading = signal(false);
-  errorMessage = signal('');
-  successMessage = signal('');
-
-  // File upload
-  selectedFile = signal<File | null>(null);
-  imagePreview = signal<string | null>(null);
-
-  // Expose Math to template
-  Math = Math;
-
-  // Modal states
   showCreateModal = signal(false);
   showEditModal = signal(false);
   showDeleteModal = signal(false);
-  showViewModal = signal(false);
-  showImageModal = signal(false);
   selectedTemplate = signal<Template | null>(null);
 
-  // Image modal
-  imageModalUrl = signal<string>('');
-  imageModalTitle = signal<string>('');
-
-  // Pagination
+  // Paginación
   currentPage = signal(1);
   totalPages = signal(1);
-  perPage = signal(15);
   totalItems = signal(0);
+  perPage = signal(10);
+  filteredTemplates = signal<Template[]>([]);
+  showViewModal = signal(false);
+
+  // Mensajes
+  successMessage = signal<string>('');
+  errorMessage = signal<string>('');
+
+  // Validación de Canva
+  isValidatingCanvaLink = signal(false);
+  canvaLinkValidated = signal(false);
+  canvaLinkValid = signal(false);
+
+  // Referencia a Math para usar en la plantilla
+  Math = Math;
 
   // Forms
   filterForm: FormGroup;
@@ -73,7 +71,8 @@ export class TemplatesComponent implements OnInit {
       name: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(255)]],
       description: ['', [Validators.maxLength(1000)]],
       activity_type: ['other', [Validators.required]],
-      status: ['active', [Validators.required]]
+      status: ['active', [Validators.required]],
+      canva_design_id: ['', Validators.required]
     });
   }
 
@@ -112,6 +111,48 @@ export class TemplatesComponent implements OnInit {
         setTimeout(() => this.errorMessage.set(''), 5000);
       }
     }, 100);
+  }
+
+  // Validar enlace de Canva
+  validateCanvaLink(): void {
+    const canvaLink = this.templateForm.get('canva_design_id')?.value;
+
+    if (!canvaLink) {
+      this.canvaLinkValid.set(false);
+      this.canvaLinkValidated.set(true);
+      return;
+    }
+
+    this.isValidatingCanvaLink.set(true);
+    this.canvaLinkValidated.set(false);
+
+    // Extraer el ID de diseño del enlace si es una URL completa
+    let designId = canvaLink;
+    if (canvaLink.includes('canva.com/design/')) {
+      const match = canvaLink.match(/\/design\/([^\/]+)/);
+      if (match && match[1]) {
+        designId = match[1];
+      }
+    }
+
+    // Simular una validación con el servicio de Canva
+    this.templateService.validateCanvaDesign(designId).subscribe({
+      next: (response) => {
+        this.isValidatingCanvaLink.set(false);
+        this.canvaLinkValidated.set(true);
+        this.canvaLinkValid.set(response.success);
+
+        // Actualizar el valor en el formulario con el ID extraído
+        if (response.success && designId !== canvaLink) {
+          this.templateForm.get('canva_design_id')?.setValue(designId, { emitEvent: false });
+        }
+      },
+      error: () => {
+        this.isValidatingCanvaLink.set(false);
+        this.canvaLinkValidated.set(true);
+        this.canvaLinkValid.set(false);
+      }
+    });
   }
 
   loadTemplates(): void {
@@ -181,11 +222,14 @@ export class TemplatesComponent implements OnInit {
       activity_type: 'other',
       status: 'active'
     });
-    this.selectedFile.set(null);
-    this.imagePreview.set(null);
     this.selectedTemplate.set(null);
     this.showCreateModal.set(true);
     this.clearMessages();
+
+    // Limpiar validación de Canva
+    this.canvaLinkValidated.set(false);
+    this.canvaLinkValid.set(false);
+    this.isValidatingCanvaLink.set(false);
   }
 
   openEditModal(template: Template): void {
@@ -196,15 +240,7 @@ export class TemplatesComponent implements OnInit {
       activity_type: template.activity_type,
       status: template.status
     });
-    this.selectedFile.set(null);
-    this.imagePreview.set(null);
     this.showEditModal.set(true);
-    this.clearMessages();
-  }
-
-  openViewModal(template: Template): void {
-    this.selectedTemplate.set(template);
-    this.showViewModal.set(true);
     this.clearMessages();
   }
 
@@ -218,26 +254,65 @@ export class TemplatesComponent implements OnInit {
     this.showCreateModal.set(false);
     this.showEditModal.set(false);
     this.showDeleteModal.set(false);
-    this.showViewModal.set(false);
     this.selectedTemplate.set(null);
-    this.selectedFile.set(null);
-    this.imagePreview.set(null);
-    this.clearMessages();
+    this.templateForm.reset({
+      activity_type: 'other',
+      status: 'active'
+    });
+
+    // Limpiar validación de Canva
+    this.canvaLinkValidated.set(false);
+    this.canvaLinkValid.set(false);
+    this.isValidatingCanvaLink.set(false);
   }
 
-  openImageModal(imageUrl: string, title: string): void {
-    this.imageModalUrl.set(imageUrl);
-    this.imageModalTitle.set(title);
-    this.showImageModal.set(true);
+  clearMessages(): void {
+    this.successMessage.set('');
+    this.errorMessage.set('');
   }
 
-  closeImageModal(): void {
-    this.showImageModal.set(false);
-    this.imageModalUrl.set('');
-    this.imageModalTitle.set('');
+  getStatusBadgeClass(status: string): string {
+    return status === 'active' ? 'badge-success' : 'badge-danger';
   }
 
-  // CRUD operations
+  // Métodos auxiliares para la UI
+  getStatusLabel(status: string): string {
+    const statusMap: { [key: string]: string } = {
+      'active': 'Activo',
+      'inactive': 'Inactivo'
+    };
+    return statusMap[status] || status;
+  }
+
+  getActivityTypeLabel(type: string): string {
+    const typeMap: { [key: string]: string } = {
+      'course': 'Curso',
+      'workshop': 'Taller',
+      'seminar': 'Seminario',
+      'conference': 'Conferencia',
+      'other': 'Otro'
+    };
+    return typeMap[type] || type;
+  }
+
+  getActivityTypeBadgeClass(type: string): string {
+    const classMap: { [key: string]: string } = {
+      'course': 'badge-course',
+      'workshop': 'badge-workshop',
+      'seminar': 'badge-seminar',
+      'conference': 'badge-conference',
+      'other': 'badge-other'
+    };
+    return classMap[type] || 'badge-default';
+  }
+
+  private markFormGroupTouched(): void {
+    Object.keys(this.templateForm.controls).forEach(key => {
+      this.templateForm.get(key)?.markAsTouched();
+    });
+  }
+
+  // Métodos para el formulario
   createTemplate(): void {
     if (this.templateForm.invalid) {
       this.markFormGroupTouched();
@@ -246,36 +321,18 @@ export class TemplatesComponent implements OnInit {
     }
 
     this.isLoading.set(true);
-    this.clearMessages();
+    this.errorMessage.set('');
 
-    const formData = new FormData();
+    // Crear objeto con los datos del formulario
+    const templateData = {
+      name: this.templateForm.get('name')?.value,
+      description: this.templateForm.get('description')?.value,
+      activity_type: this.templateForm.get('activity_type')?.value,
+      status: this.templateForm.get('status')?.value,
+      canva_design_id: this.templateForm.get('canva_design_id')?.value
+    };
 
-    // Agregar campos del formulario con validación
-    const formValue = this.templateForm.value;
-    console.log('Form values before sending:', formValue);
-    console.log('Form valid:', this.templateForm.valid);
-
-    // Agregar campos manualmente para asegurar que se incluyan
-    formData.append('name', formValue.name || '');
-    formData.append('description', formValue.description || '');
-    formData.append('activity_type', formValue.activity_type || 'other');
-    formData.append('status', formValue.status || 'active');
-    
-    // NO agregar _method para creación - solo se usa en actualizaciones
-
-    // Agregar archivo si existe
-    if (this.selectedFile()) {
-      formData.append('template_file', this.selectedFile()!);
-      console.log('Added file to FormData:', this.selectedFile()!.name);
-    }
-
-    // Debug: mostrar todos los campos del FormData
-    console.log('FormData contents:');
-    formData.forEach((value, key) => {
-      console.log(`${key}: ${value}`);
-    });
-
-    this.templateService.createTemplate(formData).subscribe({
+    this.templateService.createTemplate(templateData).subscribe({
       next: (response) => {
         this.isLoading.set(false);
         if (response.success) {
@@ -290,7 +347,6 @@ export class TemplatesComponent implements OnInit {
         this.isLoading.set(false);
         this.errorMessage.set('Error al crear plantilla');
         console.error('Error creating template:', error);
-        console.error('Error details:', error.error);
       }
     });
   }
@@ -305,60 +361,33 @@ export class TemplatesComponent implements OnInit {
     this.isLoading.set(true);
     this.clearMessages();
 
-    const formData = new FormData();
-
-    // Agregar campos del formulario con validación explícita
-    const formValue = this.templateForm.value;
-    console.log('Update form values before sending:', formValue);
-    console.log('Update form valid:', this.templateForm.valid);
-
-    // Agregar campos manualmente para asegurar que se incluyan
-    formData.append('name', formValue.name || '');
-    formData.append('description', formValue.description || '');
-    formData.append('activity_type', formValue.activity_type || 'other');
-    formData.append('status', formValue.status || 'active');
-
-    // Agregar archivo si existe
-    if (this.selectedFile()) {
-      formData.append('template_file', this.selectedFile()!);
-      console.log('Update - Added file to FormData:', this.selectedFile()!.name);
-    }
-
-    // Debug: mostrar todos los campos del FormData
-    console.log('Update FormData contents:');
-    formData.forEach((value, key) => {
-      console.log(`${key}: ${value}`);
-    });
+    // Crear objeto con los datos del formulario
+    const templateData = {
+      name: this.templateForm.get('name')?.value,
+      description: this.templateForm.get('description')?.value,
+      activity_type: this.templateForm.get('activity_type')?.value,
+      status: this.templateForm.get('status')?.value,
+      canva_design_id: this.templateForm.get('canva_design_id')?.value,
+      _method: 'PUT'
+    };
 
     const templateId = this.selectedTemplate()!.id;
 
-    console.log('🚀 Enviando petición de actualización:', {
-      templateId,
-      url: `http://localhost:8000/api/certificate-templates/${templateId}`,
-      method: 'PUT'
-    });
-
-    this.templateService.updateTemplate(templateId, formData).subscribe({
+    this.templateService.updateTemplate(templateId, templateData).subscribe({
       next: (response) => {
-        console.log('✅ Respuesta recibida del servidor:', response);
         this.isLoading.set(false);
         if (response.success) {
           this.successMessage.set('Plantilla actualizada exitosamente');
-          console.log('🔄 Recargando lista de plantillas...');
           this.closeModals();
           this.loadTemplates();
         } else {
-          console.error('❌ Error en la respuesta del servidor:', response.message);
           this.errorMessage.set(response.message || 'Error al actualizar plantilla');
         }
       },
       error: (error) => {
-        console.error('❌ Error en la petición HTTP:', error);
-        console.error('Status:', error.status);
-        console.error('StatusText:', error.statusText);
-        console.error('Error body:', error.error);
         this.isLoading.set(false);
         this.errorMessage.set('Error al actualizar plantilla');
+        console.error('Error updating template:', error);
       }
     });
   }
@@ -388,133 +417,5 @@ export class TemplatesComponent implements OnInit {
         console.error('Error deleting template:', error);
       }
     });
-  }
-
-  toggleTemplateStatus(template: Template): void {
-    const newStatus = template.status === 'active' ? 'inactive' : 'active';
-    this.clearMessages();
-
-    this.templateService.toggleTemplateStatus(template.id, newStatus).subscribe({
-      next: (response) => {
-        if (response.success) {
-          this.successMessage.set(`Plantilla ${newStatus === 'active' ? 'activada' : 'desactivada'} exitosamente`);
-          this.loadTemplates();
-        } else {
-          this.errorMessage.set(response.message || 'Error al cambiar estado');
-        }
-      },
-      error: (error) => {
-        this.errorMessage.set('Error al cambiar estado de la plantilla');
-        console.error('Error toggling template status:', error);
-      }
-    });
-  }
-
-  // Utility methods
-  private markFormGroupTouched(): void {
-    Object.keys(this.templateForm.controls).forEach(key => {
-      const control = this.templateForm.get(key);
-      control?.markAsTouched();
-      control?.markAsDirty();
-    });
-  }
-
-  private clearMessages(): void {
-    this.errorMessage.set('');
-    this.successMessage.set('');
-  }
-
-  // File handling methods
-  onFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-      const file = input.files[0];
-
-      // Validar tipo de archivo
-      if (!file.type.startsWith('image/')) {
-        this.errorMessage.set('Por favor selecciona un archivo de imagen válido');
-        return;
-      }
-
-      // Validar tamaño (máximo 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        this.errorMessage.set('El archivo es demasiado grande. Máximo 5MB');
-        return;
-      }
-
-      this.selectedFile.set(file);
-
-      // Crear vista previa
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        this.imagePreview.set(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-
-      this.clearMessages();
-    }
-  }
-
-  removeImage(): void {
-    this.selectedFile.set(null);
-    this.imagePreview.set(null);
-
-    // Limpiar el input file
-    const fileInputs = document.querySelectorAll('input[type="file"]') as NodeListOf<HTMLInputElement>;
-    fileInputs.forEach(input => {
-      input.value = '';
-    });
-  }
-
-  formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
-
-  // Getters for form validation
-  get nameInvalid(): boolean {
-    const control = this.templateForm.get('name');
-    return !!(control && control.invalid && (control.dirty || control.touched));
-  }
-
-  get descriptionInvalid(): boolean {
-    const control = this.templateForm.get('description');
-    return !!(control && control.invalid && (control.dirty || control.touched));
-  }
-
-  get activityTypeInvalid(): boolean {
-    const control = this.templateForm.get('activity_type');
-    return !!(control && control.invalid && (control.dirty || control.touched));
-  }
-
-  get statusInvalid(): boolean {
-    const control = this.templateForm.get('status');
-    return !!(control && control.invalid && (control.dirty || control.touched));
-  }
-
-  // Helper methods
-  getActivityTypeLabel(type: string): string {
-    const activityType = this.activityTypes.find(t => t.value === type);
-    return activityType ? activityType.label : type;
-  }
-
-  getStatusLabel(status: string): string {
-    const statusOption = this.statusOptions.find(s => s.value === status);
-    return statusOption ? statusOption.label : status;
-  }
-
-  getStatusBadgeClass(status: string): string {
-    return status === 'active' ? 'badge-success' : 'badge-danger';
-  }
-
-  getActivityTypeBadgeClass(type: string): string {
-    switch (type) {
-      case 'course': return 'type-course';
-      case 'event': return 'type-event';
-      default: return 'type-other';
-    }
   }
 }

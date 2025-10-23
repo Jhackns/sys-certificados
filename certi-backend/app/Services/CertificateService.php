@@ -4,12 +4,20 @@ namespace App\Services;
 
 use App\Models\Certificate;
 use App\Models\CertificateDocument;
+use App\Services\QRCodeService;
+use App\Jobs\GenerateCertificateJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CertificateService
 {
+    protected $qrCodeService;
+
+    public function __construct(QRCodeService $qrCodeService)
+    {
+        $this->qrCodeService = $qrCodeService;
+    }
     /**
      * Obtener todos los certificados con paginación
      *
@@ -121,6 +129,16 @@ class CertificateService
                             'status' => $certificate->status
                         ]
                     ]);
+
+                    // Generar datos de verificación y QR
+                    Log::info('Generando datos de verificación y QR para el certificado');
+                    $this->generateVerificationData($certificate);
+                    Log::info('Datos de verificación y QR generados exitosamente');
+
+                    // Despachar el trabajo para generar el certificado con Canva
+                    Log::info('Despachando trabajo para generar certificado en segundo plano');
+                    GenerateCertificateJob::dispatch($certificate, false); // false = no enviar email automáticamente
+                    Log::info('Trabajo despachado exitosamente');
                 } else {
                     Log::error('Certificate::create() retornó null');
                     throw new \Exception('Certificate::create() retornó null - Error en la creación');
@@ -341,6 +359,64 @@ class CertificateService
         } while (Certificate::where('unique_code', $code)->exists());
 
         return $code;
+    }
+
+    /**
+     * Generar datos de verificación y QR para el certificado
+     *
+     * @param Certificate $certificate
+     * @return void
+     */
+    private function generateVerificationData(Certificate $certificate): void
+    {
+        try {
+            // Generar códigos de verificación
+            $verificationCode = $certificate->generateVerificationCode();
+            $verificationToken = $certificate->generateVerificationToken();
+
+            // Generar URL de verificación
+            $verificationUrl = $certificate->getVerificationUrl($verificationCode);
+
+            // Generar QR code
+            $qrImagePath = $this->qrCodeService->generateQRCode($certificate, $verificationUrl);
+
+            // Preparar datos de validación
+            $validationData = [
+                'certificate_id' => $certificate->id,
+                'holder_name' => $certificate->nombre,
+                'activity_name' => $certificate->activity->name ?? 'N/A',
+                'template_name' => $certificate->template->name ?? 'N/A',
+                'issue_date' => $certificate->fecha_emision,
+                'expiry_date' => $certificate->fecha_vencimiento,
+                'status' => $certificate->status,
+                'generated_at' => now()->toISOString()
+            ];
+
+            // Actualizar el certificado con los datos de verificación
+            $certificate->update([
+                'verification_code' => $verificationCode,
+                'verification_token' => $verificationToken,
+                'verification_url' => $verificationUrl,
+                'qr_image_path' => $qrImagePath,
+                'validation_data' => $validationData,
+                'verification_count' => 0
+            ]);
+
+            Log::info('Datos de verificación generados exitosamente', [
+                'certificate_id' => $certificate->id,
+                'verification_code' => $verificationCode,
+                'qr_image_path' => $qrImagePath
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al generar datos de verificación', [
+                'certificate_id' => $certificate->id,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            throw $e;
+        }
     }
 
     /**

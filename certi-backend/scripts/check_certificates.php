@@ -12,11 +12,11 @@ echo "Certificados en BD: " . Certificate::count() . PHP_EOL;
 $certificates = Certificate::with(['user', 'activity', 'template', 'signer'])->take(5)->get();
 
 foreach ($certificates as $cert) {
-    echo "ID: " . $cert->id . 
-         ", User: " . ($cert->user ? $cert->user->id : 'NULL') . 
-         ", Activity: " . ($cert->activity ? $cert->activity->id : 'NULL') . 
-         ", Template: " . ($cert->template ? $cert->template->id : 'NULL') . 
-         ", Signer: " . ($cert->signer ? $cert->signer->id : 'NULL') . 
+    echo "ID: " . $cert->id .
+         ", User: " . ($cert->user ? $cert->user->id : 'NULL') .
+         ", Activity: " . ($cert->activity ? $cert->activity->id : 'NULL') .
+         ", Template: " . ($cert->template ? $cert->template->id : 'NULL') .
+         ", Signer: " . ($cert->signer ? $cert->signer->id : 'NULL') .
          PHP_EOL;
 }
 

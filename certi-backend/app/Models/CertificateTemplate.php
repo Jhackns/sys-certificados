@@ -17,13 +17,11 @@ class CertificateTemplate extends Model
         'file_path',
         'activity_type',
         'status',
-        'is_active',
-        'coordinates_x',
-        'coordinates_y',
+        'canva_design_id',
     ];
 
     protected $casts = [
-        // Removed is_active cast as it doesn't exist in the table
+        // Eliminados casts de campos antiguos de posicionamiento
     ];
 
     /**

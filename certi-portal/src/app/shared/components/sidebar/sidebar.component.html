@@ -12,12 +12,17 @@
         <p class="user-email">{{ currentUser()?.email || 'usuario@email.com' }}</p>
       </div>
     </div>
-    <button class="toggle-btn" (click)="toggleSidebar()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 6h18M3 12h18M3 18h18"/>
-      </svg>
-    </button>
   </div>
+  
+  <!-- Botón de toggle en posición lateral -->
+  <button class="toggle-btn-lateral" (click)="toggleSidebar()">
+    <svg *ngIf="!isCollapsed()" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M15 18l-6-6 6-6"/>
+    </svg>
+    <svg *ngIf="isCollapsed()" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M9 18l6-6-6-6"/>
+    </svg>
+  </button>
 
   <!-- Navegación principal -->
   <nav class="sidebar-nav">

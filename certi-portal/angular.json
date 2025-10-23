@@ -54,12 +54,19 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "port": 4200,
+            "host": "localhost",
+            "open": false
+          },
           "configurations": {
             "production": {
               "buildTarget": "certi-portal:build:production"
             },
             "development": {
-              "buildTarget": "certi-portal:build:development"
+              "buildTarget": "certi-portal:build:development",
+              "port": 4200,
+              "host": "localhost"
             }
           },
           "defaultConfiguration": "development"

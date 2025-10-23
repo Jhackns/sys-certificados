@@ -1,9 +1,10 @@
-import { Component, signal, OnInit } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { CertificateService } from './certificate.service';
 import { environment } from '../../../../environments/environment';
+import { TemplatePreviewComponent } from '../../../shared/template-preview/template-preview.component';
 
 interface Certificate {
   id: number;
@@ -64,18 +65,21 @@ interface ApiResponse {
   styleUrl: './certificates.component.css'
 })
 export class CertificatesComponent implements OnInit {
-  // Señales para manejar estados
+  // Mensajes
   isLoading = signal(false);
-  errorMessage = signal('');
-  successMessage = signal('');
-  
+  successMessage = signal<string>('');
+  errorMessage = signal<string>('');
+
+  // Fecha de hoy para el formulario
+  todayDate = new Date().toISOString().split('T')[0];
+
   // Señales para modales
   showViewModal = signal(false);
   showCreateModal = signal(false);
   showEditModal = signal(false);
   showDeleteModal = signal(false);
   showDownloadModal = signal(false);
-  
+
   // Señales para datos
   certificates = signal<Certificate[]>([]);
   selectedCertificate = signal<Certificate | null>(null);
@@ -206,10 +210,10 @@ export class CertificatesComponent implements OnInit {
     this.http.get<any>(`${environment.apiUrl}/users`, { params: { per_page: 100 } }).subscribe({
       next: (res) => {
         if (res?.success) {
-          const items = (res.data?.users ?? res.data ?? []).map((u: any) => ({ 
-            id: u.id, 
-            name: u.name, 
-            email: u.email 
+          const items = (res.data?.users ?? res.data ?? []).map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email
           }));
           this.users.set(items);
         }
@@ -303,7 +307,7 @@ export class CertificatesComponent implements OnInit {
     if (!certificate) return;
 
     this.isLoading.set(true);
-    
+
     // Llamar al servicio con el formato específico
     this.certificateService.downloadCertificateFormat(certificate.id, format).subscribe({
       next: (blob) => {
@@ -463,6 +467,8 @@ export class CertificatesComponent implements OnInit {
 
   // Método para obtener la clase CSS del badge de estado
   getStatusBadgeClass(status: string): string {
+    if (!status) return 'badge-default';
+
     switch (status.toLowerCase()) {
       case 'emitido':
       case 'issued':
@@ -477,7 +483,7 @@ export class CertificatesComponent implements OnInit {
       case 'expired':
         return 'badge-expired';
       default:
-        return 'badge-issued';
+        return 'badge-default';
     }
   }
 
@@ -507,38 +513,82 @@ export class CertificatesComponent implements OnInit {
 
     const template = this.templates().find(t => t.id === parseInt(templateId));
     if (template) {
-      this.selectedTemplate.set(template);
-      // Cargar vista previa de la plantilla
-      this.http.get<any>(`${environment.apiUrl}/certificate-templates/${templateId}/preview`).subscribe({
+      // Cargar datos completos de la plantilla incluyendo posiciones
+      this.http.get<any>(`${environment.apiUrl}/certificate-templates/${templateId}`).subscribe({
         next: (res) => {
-          if (res?.success && res.data?.template?.file_url) {
-            this.templatePreview.set(res.data.template.file_url);
+          if (res?.success && res.data?.template) {
+            const fullTemplate = res.data.template;
+            this.selectedTemplate.set({
+              ...template,
+              file_url: fullTemplate.file_url,
+              qr_position: fullTemplate.qr_position,
+              name_position: fullTemplate.name_position,
+              background_image_size: fullTemplate.background_image_size
+            });
+            this.templatePreview.set(fullTemplate.file_url || '');
           } else {
+            this.selectedTemplate.set(template);
             this.templatePreview.set('');
           }
         },
         error: () => {
+          this.selectedTemplate.set(template);
           this.templatePreview.set('');
         }
       });
     }
   }
 
+  // Método para obtener el nombre del usuario para la vista previa
+  getUserNameForPreview(): string {
+    const selectedUserId = this.createForm.get('user_id')?.value;
+    if (selectedUserId) {
+      const user = this.users().find(u => u.id === parseInt(selectedUserId));
+      return user?.name || 'Usuario Ejemplo';
+    }
+    return 'Usuario Ejemplo';
+  }
+
   // Validador personalizado para fechas
   dateAfterValidator(startDateField: string) {
     return (control: AbstractControl): ValidationErrors | null => {
       if (!control.value) return null;
-      
+
       const form = control.parent;
       if (!form) return null;
-      
+
       const startDate = form.get(startDateField)?.value;
       if (!startDate) return null;
-      
+
       const start = new Date(startDate);
       const end = new Date(control.value);
-      
+
       return end <= start ? { dateAfter: true } : null;
     };
   }
+
+  // Métodos auxiliares para la UI
+  getStatusLabel(status: string): string {
+    const statusMap: { [key: string]: string } = {
+      'issued': 'Emitido',
+      'pending': 'Pendiente',
+      'cancelled': 'Cancelado',
+      'expired': 'Expirado'
+    };
+    return statusMap[status.toLowerCase()] || status;
+  }
+
+  getActivityTypeLabel(type: string): string {
+    const typeMap: { [key: string]: string } = {
+      'course': 'Curso',
+      'workshop': 'Taller',
+      'seminar': 'Seminario',
+      'conference': 'Conferencia',
+      'other': 'Otro'
+    };
+    return typeMap[type] || type;
+  }
+
+  // Referencia a Math para usar en la plantilla
+  Math = Math;
 }

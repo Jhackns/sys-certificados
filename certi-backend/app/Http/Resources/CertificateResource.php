@@ -43,9 +43,9 @@ class CertificateResource extends JsonResource
                         return null;
                     }
                     return [
-                        'id' => $this->user->id,
-                        'name' => $this->user->name,
-                        'email' => $this->user->email,
+                        'id' => $this->user->id ?? null,
+                        'name' => $this->user->name ?? null,
+                        'email' => $this->user->email ?? null,
                     ];
                 }),
                 'activity' => $this->whenLoaded('activity', function () {
@@ -54,10 +54,10 @@ class CertificateResource extends JsonResource
                         return null;
                     }
                     return [
-                        'id' => $this->activity->id,
-                        'name' => $this->activity->name,
-                        'description' => $this->activity->description,
-                        'duration_hours' => $this->activity->duration_hours,
+                        'id' => $this->activity->id ?? null,
+                        'name' => $this->activity->name ?? null,
+                        'description' => $this->activity->description ?? null,
+                        'duration_hours' => $this->activity->duration_hours ?? null,
                     ];
                 }),
                 'template' => $this->whenLoaded('template', function () {
@@ -66,9 +66,9 @@ class CertificateResource extends JsonResource
                         return null;
                     }
                     return [
-                        'id' => $this->template->id,
-                        'name' => $this->template->name,
-                        'description' => $this->template->description,
+                        'id' => $this->template->id ?? null,
+                        'name' => $this->template->name ?? null,
+                        'description' => $this->template->description ?? null,
                     ];
                 }),
                 'signer' => $this->whenLoaded('signer', function () {
@@ -77,9 +77,9 @@ class CertificateResource extends JsonResource
                         return null;
                     }
                     return [
-                        'id' => $this->signer->id,
-                        'name' => $this->signer->name,
-                        'email' => $this->signer->email,
+                        'id' => $this->signer->id ?? null,
+                        'name' => $this->signer->name ?? null,
+                        'email' => $this->signer->email ?? null,
                     ];
                 }),
                 'documents' => $this->whenLoaded('documents', function () {
