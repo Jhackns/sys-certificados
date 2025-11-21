@@ -80,7 +80,11 @@ class CertificateTemplateService
                 'name' => $freshTemplate->name,
                 'description' => $freshTemplate->description,
                 'activity_type' => $freshTemplate->activity_type,
-                'status' => $freshTemplate->status
+                'status' => $freshTemplate->status,
+                'name_position' => $freshTemplate->name_position,
+                'date_position' => $freshTemplate->date_position,
+                'qr_position' => $freshTemplate->qr_position,
+                'template_styles' => $freshTemplate->template_styles,
             ]);
 
             return $freshTemplate;

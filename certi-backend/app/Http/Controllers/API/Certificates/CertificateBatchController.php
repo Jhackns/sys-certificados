@@ -46,13 +46,6 @@ class CertificateBatchController extends Controller
             // Obtener la plantilla
             $template = CertificateTemplate::findOrFail($request->template_id);
             
-            // Verificar que la plantilla tenga un ID de diseño de Canva
-            if (empty($template->canva_design_id)) {
-                return $this->errorResponse(
-                    'La plantilla seleccionada no tiene un ID de diseño de Canva configurado',
-                    Response::HTTP_BAD_REQUEST
-                );
-            }
 
             $data = $request->all();
             $sendEmail = $data['send_email'] ?? false;
@@ -80,8 +73,8 @@ class CertificateBatchController extends Controller
                 $certificate->unique_code = uniqid('cert_');
                 $certificate->save();
 
-                // Encolar el trabajo para generar el certificado
-                GenerateCertificateJob::dispatch($certificate, $sendEmail);
+                // Encolar el trabajo para generar el certificado, después del commit
+                GenerateCertificateJob::dispatch($certificate, $sendEmail)->afterCommit();
                 $jobsDispatched++;
 
                 $createdCertificates[] = [

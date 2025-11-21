@@ -4,7 +4,6 @@ export interface CertificateTemplate {
   description?: string;
   file_path?: string;
   file_url?: string;
-  canva_design_id?: string;
   activity_type: 'course' | 'event' | 'other';
   status: 'active' | 'inactive';
   qr_position?: any;

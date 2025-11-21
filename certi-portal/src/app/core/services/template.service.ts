@@ -9,11 +9,13 @@ export interface Template {
   description?: string;
   file_path?: string;
   file_url?: string;
-  canva_design_id?: string;
   activity_type: 'course' | 'event' | 'other';
   status: 'active' | 'inactive';
   qr_position?: any;
   name_position?: any;
+  date_position?: any;
+  background_image_size?: any;
+  template_styles?: any;
   created_at: string;
   updated_at: string;
   certificates_count?: number;
@@ -63,6 +65,10 @@ export class TemplateService {
     return this.http.get<ApiResponse<PaginatedResponse<Template>>>(this.apiUrl, { params });
   }
 
+  getFonts(): Observable<ApiResponse<{ fonts: string[] }>> {
+    return this.http.get<ApiResponse<{ fonts: string[] }>>(`${this.apiUrl}/fonts`);
+  }
+
   getTemplate(id: number): Observable<ApiResponse<{ template: Template }>> {
     return this.http.get<ApiResponse<{ template: Template }>>(`${this.apiUrl}/${id}`);
   }
@@ -109,7 +115,5 @@ export class TemplateService {
     return this.http.put<ApiResponse<{ template: Template }>>(`${this.apiUrl}/${id}/positions`, positions);
   }
   
-  validateCanvaDesign(designId: string): Observable<ApiResponse<any>> {
-    return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/canva/validate-design`, { canva_design_id: designId });
-  }
+  
 }

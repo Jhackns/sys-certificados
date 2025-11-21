@@ -49,7 +49,7 @@
   border-top: 4px solid #667eea;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin: 0 auto 16px;
+  margin: 0 auto 8px;
 }
 
 @keyframes spin {
@@ -241,7 +241,6 @@
   text-align: center;
 }
 
-.loading-spinner,
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -344,6 +343,21 @@
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
 }
+
+/* Botón CTA animado para crear certificados */
+.btn-cta { position: relative; isolation: isolate; }
+.btn-cta::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 14px;
+  background: conic-gradient(from 0deg, #667eea, #764ba2, #4c51bf, #667eea);
+  filter: blur(8px);
+  opacity: 0.35;
+  z-index: -1;
+  animation: spinGlow 3s linear infinite;
+}
+@keyframes spinGlow { to { transform: rotate(1turn); } }
 
 .btn-primary:active {
   transform: translateY(0);
@@ -510,7 +524,8 @@
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   animation: slideUp 0.3s ease;
 }
 
@@ -580,8 +595,6 @@
 
 .modal-body {
   padding: 32px;
-  overflow-y: auto;
-  flex: 1;
 }
 
 .modal-footer {
@@ -656,6 +669,7 @@
   font-size: 14px;
   transition: all 0.3s ease;
   background: white;
+  box-sizing: border-box;
 }
 
 .form-control:focus {
@@ -688,6 +702,17 @@ textarea.form-control {
   resize: vertical;
   min-height: 100px;
   font-family: inherit;
+}
+
+/* Contador de caracteres para la descripción */
+.char-counter {
+  display: block;
+  text-align: right;
+  margin-top: 4px;
+  color: #6b7280; /* gris neutro */
+}
+.char-counter.limit {
+  color: #e53e3e; /* rojo cuando alcanza el límite */
 }
 
 /* Vista previa de plantilla mejorada */
@@ -995,7 +1020,7 @@ textarea.form-control {
   .certificates-page {
     padding: 24px;
   }
-  
+
   .page-header h1 {
     font-size: 28px;
   }
@@ -1005,58 +1030,58 @@ textarea.form-control {
   .certificates-page {
     padding: 16px;
   }
-  
+
   .page-header {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .page-header h1 {
     font-size: 24px;
   }
-  
+
   .filters-section {
     padding: 20px;
   }
-  
+
   .filter-group {
     grid-template-columns: 1fr;
   }
-  
+
   .certificates-table th,
   .certificates-table td {
     padding: 12px 16px;
     font-size: 13px;
   }
-  
+
   .action-buttons {
     flex-direction: column;
   }
-  
+
   .modal-dialog {
     margin: 10px;
     max-height: calc(100vh - 20px);
     border-radius: 16px;
   }
-  
+
   .modal-header,
   .modal-body,
   .modal-footer {
     padding: 20px;
   }
-  
+
   .modal-header h3 {
     font-size: 20px;
   }
-  
+
   .form-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .details-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .pagination-nav {
     flex-direction: column;
     gap: 12px;
@@ -1068,10 +1093,60 @@ textarea.form-control {
     padding: 10px 16px;
     font-size: 14px;
   }
-  
+
   .btn-icon {
     width: 32px;
     height: 32px;
     font-size: 12px;
   }
+}
+/* Meta inline bajo el selector de plantilla */
+.field-inline-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.inline-info {
+  color: #6b7280; /* gris neutro */
+  font-size: 12px;
+}
+
+/* Ajustes adicionales de responsividad y scroll */
+.form-control {
+  box-sizing: border-box;
+}
+
+.modal-body {
+  max-height: none;
+  overflow: visible;
+}
+.component-coords {
+  margin-top: 10px;
+  text-align: left;
+}
+
+.coords-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+  align-items: start;
+}
+
+.coords-col h6 {
+  margin: 0 0 6px 0;
+  font-weight: 600;
+}
+
+.coord-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+}
+
+.coord-row .label {
+  width: 70px;
+  color: #6c757d;
 }

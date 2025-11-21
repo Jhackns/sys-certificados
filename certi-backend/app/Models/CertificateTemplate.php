@@ -15,13 +15,21 @@ class CertificateTemplate extends Model
         'name',
         'description',
         'file_path',
+        'name_position',
+        'date_position',
+        'qr_position',
+        'background_image_size',
+        'template_styles',
         'activity_type',
         'status',
-        'canva_design_id',
     ];
 
     protected $casts = [
-        // Eliminados casts de campos antiguos de posicionamiento
+        'name_position' => 'array',
+        'date_position' => 'array',
+        'qr_position' => 'array',
+        'background_image_size' => 'array',
+        'template_styles' => 'array',
     ];
 
     /**

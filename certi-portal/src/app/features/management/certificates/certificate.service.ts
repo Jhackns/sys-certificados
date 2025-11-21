@@ -23,6 +23,11 @@ export class CertificateService {
     return this.http.post(this.apiUrl, data);
   }
 
+  // Pre-check de creación de certificado
+  precheckCreate(data: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/precheck`, data);
+  }
+
   updateCertificate(id: number, data: any): Observable<any> {
     return this.http.put(`${this.apiUrl}/${id}`, data);
   }

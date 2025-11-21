@@ -4,8 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
+use App\Models\CertificateDocument;
 use App\Models\User;
-use App\Services\CanvaService;
+use App\Services\CertificateImageService;
 use App\Services\QRCodeService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,80 +32,65 @@ class GenerateCertificateJob implements ShouldQueue
     {
         $this->certificate = $certificate;
         $this->sendEmail = $sendEmail;
+        // Ejecutar el job después de que la transacción se confirme
+        $this->afterCommit = true;
     }
 
     /**
      * Execute the job.
      */
-    public function handle(CanvaService $canvaService, QRCodeService $qrService): void
+    public function handle(QRCodeService $qrService, CertificateImageService $imageService): void
     {
-        try {
-            Log::info('Iniciando generación de certificado en segundo plano', [
+        Log::info('Iniciando generación de certificado en segundo plano (ruta local PNG)', [
+            'certificate_id' => $this->certificate->id,
+            'user_id' => $this->certificate->user_id
+        ]);
+
+        // Obtener la plantilla
+        $template = CertificateTemplate::findOrFail($this->certificate->id_template);
+
+        // Obtener el usuario
+        $user = User::findOrFail($this->certificate->user_id);
+
+        // Generar URL para verificación
+        $verificationUrl = url("/verify/{$this->certificate->unique_code}");
+
+        // Generar QR
+        $qrRelativePath = $qrService->generateQRCodeFromUrl($verificationUrl);
+
+        // Convertir ruta relativa del QR a absoluta para el servicio de imagen
+        $qrAbsolutePath = $qrRelativePath ? storage_path('app/public/' . $qrRelativePath) : '';
+
+        // Generar imagen final del certificado (PNG) con nombre y QR
+        $finalImageRelativePath = $imageService->generateFinalCertificateImage($this->certificate, $qrAbsolutePath);
+
+        // Registrar documento del certificado (imagen)
+        if ($finalImageRelativePath) {
+            CertificateDocument::create([
                 'certificate_id' => $this->certificate->id,
-                'user_id' => $this->certificate->user_id
+                'document_type' => 'image',
+                'file_path' => $finalImageRelativePath,
+                'uploaded_at' => now(),
             ]);
+        }
 
-            // Obtener la plantilla
-            $template = CertificateTemplate::findOrFail($this->certificate->id_template);
+        // Actualizar estado del certificado
+        $this->certificate->status = 'issued';
+        $this->certificate->save();
 
-            if (empty($template->canva_design_id)) {
-                throw new Exception('La plantilla no tiene un ID de diseño de Canva configurado');
-            }
+        Log::info('Certificado generado exitosamente (PNG)', [
+            'certificate_id' => $this->certificate->id,
+            'file_path' => $finalImageRelativePath
+        ]);
 
-            // Obtener el usuario
-            $user = User::findOrFail($this->certificate->user_id);
+        // Enviar correo electrónico si está habilitado
+        if ($this->sendEmail && $user->email) {
+            Mail::to($user->email)->send(new CertificateGenerated($this->certificate));
 
-            // Generar URL para el QR
-            $verificationUrl = url("/verify/{$this->certificate->unique_code}");
-            $qrImagePath = $qrService->generateQRCodeFromUrl($verificationUrl);
-
-            // Preparar datos para Canva
-            $userData = [
-                'user_id' => $user->id,
-                'nombre' => $this->certificate->nombre ?? $user->name,
-                'titulo' => $template->name,
-                'fecha_emision' => $this->certificate->fecha_emision,
-                'fecha_vencimiento' => $this->certificate->fecha_vencimiento,
-                'qr_url' => $verificationUrl,
-                'activity_name' => $this->certificate->activity->name ?? '',
-                'activity_duration' => $this->certificate->activity->duration_hours ?? '',
-            ];
-
-            // Generar el certificado con Canva
-            $pdfPath = $canvaService->generateCertificate($template->canva_design_id, $userData);
-
-            // Actualizar el certificado con la ruta del archivo
-            $this->certificate->file_path = $pdfPath;
-            $this->certificate->status = 'issued';
-            $this->certificate->save();
-
-            Log::info('Certificado generado exitosamente', [
+            Log::info('Correo de certificado enviado', [
                 'certificate_id' => $this->certificate->id,
-                'file_path' => $pdfPath
+                'user_email' => $user->email
             ]);
-
-            // Enviar correo electrónico si está habilitado
-            if ($this->sendEmail && $user->email) {
-                Mail::to($user->email)->send(new CertificateGenerated($this->certificate));
-
-                Log::info('Correo de certificado enviado', [
-                    'certificate_id' => $this->certificate->id,
-                    'user_email' => $user->email
-                ]);
-            }
-        } catch (Exception $e) {
-            Log::error('Error al generar certificado en segundo plano', [
-                'certificate_id' => $this->certificate->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            // Marcar el certificado como fallido
-            $this->certificate->status = 'failed';
-            $this->certificate->save();
-
-            // Relanzar la excepción para que Laravel maneje los reintentos
-            throw $e;
         }
     }
 }

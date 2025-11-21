@@ -153,10 +153,14 @@
                 <button
                   class="btn btn-sm btn-outline-danger"
                   (click)="openDeleteModal(template)"
-                  title="Eliminar plantilla"
+                  [disabled]="(template.certificates_count || 0) > 0"
+                  [title]="(template.certificates_count || 0) > 0 ? 'No se puede eliminar: plantilla en uso (' + (template.certificates_count || 0) + ')' : 'Eliminar plantilla'"
                 >
                   <i class="fas fa-trash"></i>
                 </button>
+                <small class="inline-hint" *ngIf="(template.certificates_count || 0) > 0">
+                  No se puede eliminar: vinculada a {{ template.certificates_count }} certificado(s)
+                </small>
               </div>
             </td>
           </tr>
@@ -204,7 +208,7 @@
 
 
 <!-- Modal para crear plantilla -->
-<div class="modal-overlay" *ngIf="showCreateModal()" (click)="closeModals()">
+<div class="modal-overlay" *ngIf="showCreateModal()">
   <div class="modal-dialog" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>Nueva Plantilla</h3>
@@ -257,26 +261,29 @@
           </select>
         </div>
 
+        <!-- Subida de imagen de fondo de plantilla -->
         <div class="form-group">
-          <label>Enlace de Diseño de Canva *</label>
-          <div class="canva-link-container">
-            <input
-              class="form-control"
-              type="text"
-              formControlName="canva_design_id"
-              placeholder="Ej: https://www.canva.com/design/DAEX..."
-              (blur)="validateCanvaLink()"
-            >
-            <div class="canva-validation-indicator" *ngIf="canvaLinkValidated()">
-              <i class="fas" [ngClass]="canvaLinkValid() ? 'fa-check-circle text-success' : 'fa-times-circle text-danger'"></i>
-              <span [ngClass]="canvaLinkValid() ? 'text-success' : 'text-danger'">
-                {{ canvaLinkValid() ? 'Enlace validado' : 'Enlace incorrecto, intente otra vez' }}
-              </span>
+          <label>Imagen de Fondo de Plantilla *</label>
+          <div class="file-upload-container">
+            <input id="templateFileInput" class="file-input" type="file" accept="image/*" (change)="onTemplateFileSelected($event)">
+            <label for="templateFileInput" class="file-upload-label">
+              <i class="fas fa-upload"></i>
+              <span>Selecciona una imagen (JPG/PNG)</span>
+            </label>
+            <small class="text-muted">Se usará como fondo del certificado.</small>
+            <div class="hint-message hint-warning" *ngIf="!uploadedPreviewUrl">Sube una imagen de plantilla antes de crear</div>
+            <div class="hint-message hint-success" *ngIf="uploadedPreviewUrl">Posiciona tus componentes dentro de la imagen</div>
+            <div class="image-preview-container" *ngIf="uploadedPreviewUrl">
+              <img [src]="uploadedPreviewUrl" alt="Vista previa" class="template-preview-image">
+              <button type="button" class="btn-remove-image" (click)="removeSelectedImage()" title="Quitar imagen">×</button>
             </div>
-            <div class="error-message" *ngIf="templateForm.get('canva_design_id')?.touched && templateForm.get('canva_design_id')?.errors">
-              <span *ngIf="templateForm.get('canva_design_id')?.errors?.['required']">El enlace de diseño de Canva es requerido</span>
-            </div>
-            <small class="form-text text-muted">Ingrese el enlace completo del diseño creado en Canva para generar certificados automáticamente.</small>
+          </div>
+          <div class="position-editor-section" *ngIf="uploadedPreviewUrl">
+            <button type="button" class="btn btn-primary btn-position-editor" (click)="openPositionEditor()">
+              <i class="fas fa-pencil-ruler"></i>
+              Abrir editor de posiciones
+            </button>
+            <small>Configura posiciones y estilo de Nombres, Fecha y QR sobre la imagen.</small>
           </div>
         </div>
 
@@ -288,10 +295,10 @@
           Cancelar
         </button>
         <button
-          type="submit"
-          class="btn btn-primary"
-          [disabled]="templateForm.invalid || isLoading()"
-        >
+           type="submit"
+           class="btn btn-primary"
+           [disabled]="templateForm.invalid || isLoading() || !uploadedFile"
+         >
           <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
           Crear Plantilla
         </button>
@@ -300,8 +307,114 @@
   </div>
 </div>
 
+<!-- Editor visual -->
+<div class="modal-overlay editor-overlay" *ngIf="showEditor()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()" style="max-width: 1000px; width: 90vw;">
+      <div class="modal-header">
+        <h3>Editor de Plantilla</h3>
+        <div class="editor-toolbar">
+          <button class="btn btn-secondary" (click)="addNameElement()" [class.btn-selected]="hasElement('name')">
+            <i class="fas fa-user"></i>
+            Agregar Nombres
+          </button>
+          <button class="btn btn-secondary" (click)="addDateElement()" [class.btn-selected]="hasElement('date')">
+            <i class="fas fa-calendar"></i>
+            Fecha de Emisión
+          </button>
+          <button class="btn btn-secondary" (click)="addQrElement()" [class.btn-selected]="hasElement('qr')">
+            <i class="fas fa-qrcode"></i>
+            Agregar QR
+          </button>
+        </div>
+        <button class="btn-close" (click)="closePositionEditor()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+    <div class="modal-body">
+      <div class="image-size-info" *ngIf="editorCanvasSize() as cs">
+        <small>
+          Render: {{ cs.width }}×{{ cs.height }} px
+          | Base: {{ selectedTemplate()?.background_image_size?.width || '—' }}×{{ selectedTemplate()?.background_image_size?.height || '—' }} px
+        </small>
+      </div>
+      <div class="editor-canvas" *ngIf="uploadedPreviewUrl">
+        <div class="editor-layer" [style.transform]="'translate(' + backgroundOffset().x + 'px, ' + backgroundOffset().y + 'px)'">
+          <img [src]="uploadedPreviewUrl" class="editor-background" alt="Fondo">
+
+          <!-- Elementos superpuestos -->
+          <div *ngFor="let el of editorElements(); let i = index"
+               class="editor-element"
+               [class.selected]="selectedElementIndex() === i"
+               [style.top.px]="el.y"
+               [style.left.px]="el.x"
+               [style.transform]="'rotate(' + (el.rotation || 0) + 'deg)'"
+               (mousedown)="startDrag($event, i)"
+               (click)="selectElement(i)">
+            <button type="button" class="delete-element-btn" *ngIf="selectedElementIndex() === i" (click)="deleteSelectedElement()" title="Eliminar">
+              <i class="fas fa-trash"></i>
+            </button>
+            <ng-container [ngSwitch]="el.type">
+              <div *ngSwitchCase="'name'" class="text-element"
+                   [style.fontFamily]="el.fontFamily || 'Arial'"
+                   [style.fontSize.px]="el.fontSize || 28"
+                   [style.color]="el.color || '#000'">
+                Nombres Completos
+                <span class="hint">Posiciona y ajusta fuente/estilo</span>
+              </div>
+              <div *ngSwitchCase="'date'" class="text-element"
+                   [style.fontFamily]="el.fontFamily || 'Arial'"
+                   [style.fontSize.px]="el.fontSize || 16"
+                   [style.color]="el.color || '#333'">
+                Fecha de Emisión
+              </div>
+              <div *ngSwitchCase="'qr'" class="qr-element" [style.width.px]="el.width || 120" [style.height.px]="el.height || 120">
+                <i class="fas fa-qrcode"></i>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel de propiedades del elemento seleccionado -->
+      <div class="editor-properties" *ngIf="selectedElementIndex() !== null">
+        <h4>Propiedades del elemento</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Coordenadas (relativas al centro)</label>
+            <div class="coords-inline">
+              <span>X: {{ getSelectedRelativeX() }}</span>
+              <span>Y: {{ getSelectedRelativeY() }}</span>
+            </div>
+          </div>
+          <div class="form-group" *ngIf="!isSelectedType('qr')">
+            <label>Fuente</label>
+            <select class="form-control" [value]="getSelected()?.fontFamily || ''" (change)="updateFontFamily($event)">
+              <option *ngFor="let font of availableFonts()" [value]="font">{{ font }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tamaño</label>
+            <input *ngIf="!isSelectedType('qr')" type="number" class="form-control" (input)="updateFontSize($event)" [value]="getSelected()?.fontSize || 28" min="6" max="200">
+            <input *ngIf="isSelectedType('qr')" type="number" class="form-control" (input)="updateQrSize($event)" [value]="getSelected()?.width || 120" min="20" max="1000">
+          </div>
+          <div class="form-group">
+            <label>Rotación</label>
+            <input type="number" class="form-control" (input)="updateRotation($event)" [value]="getSelected()?.rotation || 0" min="-180" max="180">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="cancelEditor()">Cancelar</button>
+      <button type="button" class="btn btn-primary" (click)="saveEditor()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal para editar plantilla -->
-<div class="modal-overlay" *ngIf="showEditModal()" (click)="closeModals()">
+<div class="modal-overlay" *ngIf="showEditModal()">
   <div class="modal-dialog" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>Editar Plantilla</h3>
@@ -355,34 +468,34 @@
         </div>
 
         <div class="form-group">
-          <label>Cambiar Diseño de Canva</label>
-          <div class="canva-link-container">
-            <input
-              class="form-control"
-              type="text"
-              formControlName="canva_design_id"
-              placeholder="Ej: https://www.canva.com/design/DAEX... o ID directo"
-              (blur)="validateCanvaLink()"
-            >
-            <div class="canva-validation-indicator" *ngIf="canvaLinkValidated()">
-              <i class="fas" [ngClass]="canvaLinkValid() ? 'fa-check-circle text-success' : 'fa-times-circle text-danger'"></i>
-              <span [ngClass]="canvaLinkValid() ? 'text-success' : 'text-danger'">
-                {{ canvaLinkValid() ? 'Diseño válido' : 'Diseño inválido, intente otra vez' }}
-              </span>
+          <label>Cambiar imagen de fondo (opcional)</label>
+          <div class="file-upload-container">
+            <input id="templateFileInputEdit" class="file-input" type="file" accept="image/*" (change)="onTemplateFileSelected($event)">
+            <label for="templateFileInputEdit" class="file-upload-label">
+              <i class="fas fa-upload"></i>
+              <span>Selecciona una imagen (JPG/PNG)</span>
+            </label>
+            <div class="hint-message hint-warning" *ngIf="!uploadedPreviewUrl && !(selectedTemplate()?.file_url || selectedTemplate()?.file_path)">Sube una imagen de plantilla antes de editar</div>
+            <div class="hint-message hint-success" *ngIf="uploadedPreviewUrl || selectedTemplate()?.file_url || selectedTemplate()?.file_path">Posiciona tus componentes dentro de la imagen</div>
+            <div class="image-preview-container" *ngIf="uploadedPreviewUrl">
+              <img [src]="uploadedPreviewUrl" alt="Vista previa" class="template-preview-image">
+              <button type="button" class="btn-remove-image" (click)="removeSelectedImage()" title="Quitar imagen">×</button>
             </div>
-            <div class="error-message" *ngIf="templateForm.get('canva_design_id')?.touched && templateForm.get('canva_design_id')?.errors">
-              <span *ngIf="templateForm.get('canva_design_id')?.errors?.['required']">El enlace de diseño de Canva es requerido</span>
+            <div class="position-editor-section" *ngIf="uploadedPreviewUrl || selectedTemplate()?.file_url || selectedTemplate()?.file_path">
+              <button type="button" class="btn btn-secondary btn-position-editor" (click)="openPositionEditor()">
+                <i class="fas fa-pencil-ruler"></i>
+                Abrir editor de posiciones
+              </button>
             </div>
-            <small class="form-text text-muted">Ingrese el enlace completo del diseño creado en Canva o el ID directo del diseño.</small>
+            <small class="text-muted">Si no subes una nueva imagen, se conservará la actual.</small>
           </div>
         </div>
 
-        <!-- Vista previa del diseño actual -->
-        <div class="form-group" *ngIf="selectedTemplate()?.canva_design_id">
-          <label>Diseño Actual</label>
-          <div class="current-design-info">
-            <p><strong>ID del diseño:</strong> {{ selectedTemplate()?.canva_design_id }}</p>
-            <p><strong>Enlace de Canva:</strong> <a [href]="'https://www.canva.com/design/' + selectedTemplate()?.canva_design_id + '/view'" target="_blank" rel="noopener noreferrer">Ver diseño en Canva</a></p>
+        <!-- Vista previa del fondo actual -->
+        <div class="form-group" *ngIf="(selectedTemplate()?.file_url || selectedTemplate()?.file_path) && !uploadedPreviewUrl">
+          <label>Fondo actual</label>
+          <div class="image-preview-container">
+            <img [src]="selectedTemplate()?.file_url || selectedTemplate()?.file_path" alt="Fondo actual" class="template-preview-image">
           </div>
         </div>
       </div>
@@ -405,7 +518,7 @@
 </div>
 
 <!-- Modal para confirmar eliminación -->
-<div class="modal-overlay" *ngIf="showDeleteModal()" (click)="closeModals()">
+<div class="modal-overlay" *ngIf="showDeleteModal()">
   <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>Confirmar Eliminación</h3>
@@ -442,7 +555,7 @@
 
 
 <!-- Modal para ver detalles -->
-<div class="modal-overlay" *ngIf="showViewModal()" (click)="closeModals()">
+<div class="modal-overlay" *ngIf="showViewModal()">
   <div class="modal-dialog" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>Detalles de la Plantilla</h3>

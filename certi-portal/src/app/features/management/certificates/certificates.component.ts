@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, effect, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -18,6 +18,8 @@ interface Certificate {
   signed_by?: number;
   unique_code: string;
   qr_url?: string;
+  qr?: string;
+  qr_image_url?: string;
   status: string;
   user?: {
     id: number;
@@ -60,7 +62,7 @@ interface ApiResponse {
 @Component({
   selector: 'app-certificates',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, TemplatePreviewComponent],
   templateUrl: './certificates.component.html',
   styleUrl: './certificates.component.css'
 })
@@ -89,6 +91,10 @@ export class CertificatesComponent implements OnInit {
   selectedTemplate = signal<any>(null);
   templatePreview = signal('');
   certificatePreview = signal('');
+  templateLoading = signal(false);
+  templateInfoMessage = signal('');
+
+
 
   // Pagination
   currentPage = signal(1);
@@ -101,6 +107,25 @@ export class CertificatesComponent implements OnInit {
 
   // Create form
   createForm: FormGroup;
+  // Edit form
+  editForm: FormGroup;
+
+  private _successTimer: any;
+  private _errorTimer: any;
+
+  // Efecto para auto-ocultar mensajes; debe crearse en contexto de inyección
+  private autoHideEffect = effect(() => {
+    const s = this.successMessage();
+    if (s) {
+      if (this._successTimer) clearTimeout(this._successTimer);
+      this._successTimer = setTimeout(() => this.successMessage.set(''), 5000);
+    }
+    const e = this.errorMessage();
+    if (e) {
+      if (this._errorTimer) clearTimeout(this._errorTimer);
+      this._errorTimer = setTimeout(() => this.errorMessage.set(''), 5000);
+    }
+  });
 
   constructor(
     private certificateService: CertificateService,
@@ -121,19 +146,36 @@ export class CertificatesComponent implements OnInit {
       user_id: ['', [Validators.required]],
       id_template: ['', [Validators.required]],
       nombre: ['', [Validators.required, Validators.maxLength(255)]],
-      descripcion: ['', [Validators.maxLength(1000)]],
-      fecha_emision: ['', [Validators.required]],
+      descripcion: ['', [Validators.maxLength(2000)]],
+      fecha_emision: [this.todayDate, [Validators.required]],
       fecha_vencimiento: ['', [this.dateAfterValidator('fecha_emision')]],
       activity_id: ['', [Validators.required]],
       signed_by: [''],
       status: ['issued']
     });
+
+    this.editForm = this.fb.group({
+      user_id: ['', [Validators.required]],
+      id_template: ['', [Validators.required]],
+      nombre: ['', [Validators.required, Validators.maxLength(255)]],
+      descripcion: ['', [Validators.maxLength(2000)]],
+      fecha_emision: ['', [Validators.required]],
+      fecha_vencimiento: [''],
+      activity_id: ['', [Validators.required]],
+      signed_by: [''],
+      status: ['issued']
+    });
+
+    // Eliminado: no forzar errores manuales, ya existe Validators.maxLength(2000)
   }
+
+  // Contador de caracteres de descripción
 
   ngOnInit(): void {
     this.loadCertificates();
     this.loadSelectData();
   }
+
 
   loadCertificates(page: number = 1): void {
     this.isLoading.set(true);
@@ -178,6 +220,8 @@ export class CertificatesComponent implements OnInit {
       }
     });
   }
+
+  // Eliminado: el efecto ahora se declara como propiedad de clase
 
   // Métodos para manejar la paginación
   goToPage(page: number): void {
@@ -236,7 +280,7 @@ export class CertificatesComponent implements OnInit {
     this.http.get<any>(`${environment.apiUrl}/certificate-templates`, { params: { per_page: 100 } }).subscribe({
       next: (res) => {
         if (res?.success) {
-          const items = (res.data?.templates ?? res.data ?? []).map((t: any) => ({ id: t.id, name: t.name }));
+          const items = (res.data?.templates ?? res.data ?? []).map((t: any) => ({ id: t.id, name: t.name, status: t.status }));
           this.templates.set(items);
         }
       },
@@ -247,11 +291,41 @@ export class CertificatesComponent implements OnInit {
   // Métodos para manejar modales
 
   openCreateModal(): void {
+    // Reset con valores por defecto para evitar fallo en primer clic
+    this.createForm.reset({
+      user_id: '',
+      id_template: '',
+      nombre: '',
+      descripcion: '',
+      fecha_emision: this.todayDate,
+      fecha_vencimiento: '',
+      activity_id: '',
+      signed_by: '',
+      status: 'issued'
+    });
     this.showCreateModal.set(true);
   }
 
   openEditModal(certificate: Certificate): void {
     this.selectedCertificate.set(certificate);
+    // Formatear fechas a YYYY-MM-DD
+    const toYmd = (d: any) => {
+      if (!d) return '';
+      const date = new Date(d);
+      if (isNaN(date.getTime())) return String(d).slice(0, 10);
+      return date.toISOString().slice(0, 10);
+    };
+    this.editForm.reset({
+      user_id: certificate.user_id,
+      id_template: certificate.id_template,
+      nombre: certificate.nombre,
+      descripcion: certificate.descripcion || '',
+      fecha_emision: toYmd(certificate.fecha_emision),
+      fecha_vencimiento: toYmd(certificate.fecha_vencimiento),
+      activity_id: certificate.activity_id,
+      signed_by: certificate.signed_by || '',
+      status: certificate.status || 'issued'
+    });
     this.showEditModal.set(true);
   }
 
@@ -318,7 +392,12 @@ export class CertificatesComponent implements OnInit {
         a.download = `certificado-${certificate.id}.${format}`;
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
+        if (format === 'pdf') {
+          window.open(url, '_blank');
+          setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+        } else {
+          window.URL.revokeObjectURL(url);
+        }
         a.remove();
         this.closeModals();
         this.successMessage.set(`Certificado descargado en formato ${format.toUpperCase()}`);
@@ -354,33 +433,127 @@ export class CertificatesComponent implements OnInit {
     this.showViewModal.set(true);
     // Cargar vista previa automáticamente
     this.loadCertificatePreview(certificate.id);
+    // Reintentar si aún se está generando en background
+    setTimeout(() => {
+      if (!this.certificatePreview()) {
+        this.loadCertificatePreview(certificate.id);
+      }
+    }, 1500);
+    const tplId = certificate.template?.id;
+    if (tplId) {
+      this.http.get<any>(`${environment.apiUrl}/certificate-templates/${tplId}`).subscribe({
+        next: (res) => {
+          const fullTemplate = res?.data?.template;
+          if (fullTemplate) {
+            this.selectedTemplate.set({
+              id: fullTemplate.id,
+              name: fullTemplate.name,
+              status: fullTemplate.status,
+              file_url: fullTemplate.file_url,
+              qr_position: fullTemplate.qr_position,
+              name_position: fullTemplate.name_position,
+              date_position: fullTemplate.date_position,
+              background_image_size: fullTemplate.background_image_size,
+              template_styles: fullTemplate.template_styles
+            });
+          }
+        },
+        error: () => {}
+      });
+    }
+    this.certificateService.getCertificate(certificate.id).subscribe({
+      next: (detail) => {
+        if (detail?.data?.certificate) {
+          this.selectedCertificate.set(detail.data.certificate);
+        }
+      },
+      error: () => {}
+    });
   }
 
   // Crear certificado
   createCertificate(): void {
     if (this.createForm.invalid) {
       Object.values(this.createForm.controls).forEach(c => c.markAsTouched());
+      this.errorMessage.set('Completa los campos requeridos');
       return;
     }
     this.isLoading.set(true);
     const payload = this.createForm.value;
-    this.certificateService.createCertificate(payload).subscribe({
+    // Pre-check antes de crear
+    this.certificateService.precheckCreate(payload).subscribe({
       next: (res) => {
+        const ok = !!res?.success && !!res?.data?.ready;
+        if (!ok) {
+          this.isLoading.set(false);
+          const details = res?.data?.details;
+          const msgs = Array.isArray(details?.errors) ? details.errors.join('; ') : (res?.message || 'Pre-check falló');
+          this.errorMessage.set(msgs);
+          return;
+        }
+
+        // Si todo listo, proceder a crear
+        this.certificateService.createCertificate(payload).subscribe({
+          next: (createRes) => {
+            this.isLoading.set(false);
+            if (createRes?.success) {
+              this.successMessage.set('Certificado creado correctamente');
+              this.closeModals();
+              this.createForm.reset({ status: 'issued', fecha_emision: this.todayDate });
+              this.loadCertificates(this.currentPage());
+            } else {
+              this.errorMessage.set(createRes?.message || 'No se pudo crear el certificado');
+            }
+          },
+          error: (createErr) => {
+            this.isLoading.set(false);
+            this.errorMessage.set(createErr?.error?.message || 'Error al crear el certificado');
+          }
+        });
+      },
+      error: (err) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(err?.error?.message || 'Error en pre-check antes de crear');
+      }
+    });
+  }
+
+  // Actualizar certificado
+  updateCertificate(): void {
+    const certificate = this.selectedCertificate();
+    if (!certificate) return;
+    if (this.editForm.invalid) {
+      Object.values(this.editForm.controls).forEach(c => c.markAsTouched());
+      this.errorMessage.set('Completa los campos requeridos');
+      return;
+    }
+    this.isLoading.set(true);
+    const payload = this.editForm.value;
+    this.certificateService.updateCertificate(certificate.id, payload).subscribe({
+      next: (res: any) => {
         this.isLoading.set(false);
         if (res?.success) {
-          this.successMessage.set('Certificado creado correctamente');
+          this.successMessage.set('Certificado actualizado correctamente');
           this.closeModals();
-          this.createForm.reset({ status: 'issued' });
           this.loadCertificates(this.currentPage());
         } else {
-          this.errorMessage.set(res?.message || 'No se pudo crear el certificado');
+          this.errorMessage.set(res?.message || 'No se pudo actualizar el certificado');
         }
       },
       error: (err) => {
         this.isLoading.set(false);
-        this.errorMessage.set(err?.error?.message || 'Error al crear el certificado');
+        this.errorMessage.set(err?.error?.message || 'Error al actualizar el certificado');
       }
     });
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      if (this.showCreateModal() || this.showEditModal() || this.showDeleteModal() || this.showViewModal() || this.showDownloadModal()) {
+        this.closeModals();
+      }
+    }
   }
 
   // Método para descargar un certificado
@@ -488,8 +661,9 @@ export class CertificatesComponent implements OnInit {
   }
 
   // Método para obtener el texto de estado
-  getStatusText(status: string): string {
-    switch (status.toLowerCase()) {
+  getStatusText(status?: string): string {
+    const s = (status || '').toLowerCase();
+    switch (s) {
       case 'issued':
         return 'Emitido';
       case 'pending':
@@ -499,7 +673,7 @@ export class CertificatesComponent implements OnInit {
       case 'expired':
         return 'Expirado';
       default:
-        return status;
+        return status || '—';
     }
   }
 
@@ -508,11 +682,15 @@ export class CertificatesComponent implements OnInit {
     if (!templateId) {
       this.selectedTemplate.set(null);
       this.templatePreview.set('');
+      this.templateLoading.set(false);
+      this.templateInfoMessage.set('');
       return;
     }
 
     const template = this.templates().find(t => t.id === parseInt(templateId));
     if (template) {
+      this.templateLoading.set(true);
+      this.templateInfoMessage.set('Cargando datos de la plantilla...');
       // Cargar datos completos de la plantilla incluyendo posiciones
       this.http.get<any>(`${environment.apiUrl}/certificate-templates/${templateId}`).subscribe({
         next: (res) => {
@@ -523,21 +701,34 @@ export class CertificatesComponent implements OnInit {
               file_url: fullTemplate.file_url,
               qr_position: fullTemplate.qr_position,
               name_position: fullTemplate.name_position,
-              background_image_size: fullTemplate.background_image_size
+              date_position: fullTemplate.date_position,
+              background_image_size: fullTemplate.background_image_size,
+              template_styles: fullTemplate.template_styles
             });
             this.templatePreview.set(fullTemplate.file_url || '');
+            if (fullTemplate.file_url) {
+              this.templateInfoMessage.set('Autocompletado de texto listo');
+            } else {
+              this.templateInfoMessage.set('La plantilla no tiene imagen de fondo; autocompletado de texto listo (QR deshabilitado)');
+            }
           } else {
             this.selectedTemplate.set(template);
             this.templatePreview.set('');
+            this.templateInfoMessage.set('Detalles no disponibles; usando datos básicos');
           }
+          this.templateLoading.set(false);
         },
         error: () => {
           this.selectedTemplate.set(template);
           this.templatePreview.set('');
+          this.templateInfoMessage.set('No se pudo cargar detalles; usando datos básicos');
+          this.templateLoading.set(false);
         }
       });
     }
   }
+
+
 
   // Método para obtener el nombre del usuario para la vista previa
   getUserNameForPreview(): string {
@@ -568,17 +759,18 @@ export class CertificatesComponent implements OnInit {
   }
 
   // Métodos auxiliares para la UI
-  getStatusLabel(status: string): string {
+  getStatusLabel(status?: string): string {
     const statusMap: { [key: string]: string } = {
       'issued': 'Emitido',
       'pending': 'Pendiente',
       'cancelled': 'Cancelado',
       'expired': 'Expirado'
     };
-    return statusMap[status.toLowerCase()] || status;
+    const s = (status || '').toLowerCase();
+    return statusMap[s] || (status || '—');
   }
 
-  getActivityTypeLabel(type: string): string {
+  getActivityTypeLabel(type?: string): string {
     const typeMap: { [key: string]: string } = {
       'course': 'Curso',
       'workshop': 'Taller',
@@ -586,9 +778,108 @@ export class CertificatesComponent implements OnInit {
       'conference': 'Conferencia',
       'other': 'Otro'
     };
-    return typeMap[type] || type;
+    return typeMap[type || ''] || (type || '—');
   }
 
   // Referencia a Math para usar en la plantilla
   Math = Math;
+
+  // URL de QR para previsualización
+  getQrPreviewUrl(): string | null {
+    const cert = this.selectedCertificate();
+    if (!cert) return null;
+    if (cert.qr_url) return cert.qr_url;
+    const data = cert.unique_code || String(cert.id || '');
+    if (!data) return null;
+    const sizeBase = this.selectedTemplate()?.qr_position?.width || this.selectedTemplate()?.qr_position?.size || 120;
+    const size = Math.max(80, Math.min(300, Number(sizeBase || 120)));
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
+  }
+
+  private getCoordsOrigin(): 'center' | 'left-top' {
+    const origin = String(this.selectedTemplate()?.template_styles?.coords_origin || 'center').toLowerCase();
+    return origin === 'left-top' ? 'left-top' : 'center';
+  }
+
+  private getBaseWidth(): number {
+    return Number(this.selectedTemplate()?.background_image_size?.width || 0);
+  }
+
+  private getBaseHeight(): number {
+    return Number(this.selectedTemplate()?.background_image_size?.height || 0);
+  }
+
+  getNameCoordX(): string {
+    const t = this.selectedTemplate();
+    if (!t?.name_position) return '—';
+    const baseW = this.getBaseWidth();
+    const origin = this.getCoordsOrigin();
+    const raw = t.name_position.x != null ? Number(t.name_position.x) : (t.name_position.left != null ? Number(t.name_position.left) - (baseW / 2) : 0);
+    return raw.toFixed(2);
+  }
+
+  getNameCoordY(): string {
+    const t = this.selectedTemplate();
+    if (!t?.name_position) return '—';
+    const baseH = this.getBaseHeight();
+    const origin = this.getCoordsOrigin();
+    const raw = t.name_position.y != null ? Number(t.name_position.y) : (t.name_position.top != null ? Number(t.name_position.top) - (baseH / 2) : 0);
+    return raw.toFixed(2);
+  }
+
+  getDateCoordX(): string {
+    const t = this.selectedTemplate();
+    if (!t?.date_position) return '—';
+    const baseW = this.getBaseWidth();
+    const origin = this.getCoordsOrigin();
+    const raw = t.date_position.x != null ? Number(t.date_position.x) : (t.date_position.left != null ? Number(t.date_position.left) - (baseW / 2) : 0);
+    return raw.toFixed(2);
+  }
+
+  getDateCoordY(): string {
+    const t = this.selectedTemplate();
+    if (!t?.date_position) return '—';
+    const baseH = this.getBaseHeight();
+    const origin = this.getCoordsOrigin();
+    const raw = t.date_position.y != null ? Number(t.date_position.y) : (t.date_position.top != null ? Number(t.date_position.top) - (baseH / 2) : 0);
+    return raw.toFixed(2);
+  }
+
+  getQrCoordX(): string {
+    const t = this.selectedTemplate();
+    if (!t?.qr_position) return '—';
+    const baseW = this.getBaseWidth();
+    const origin = this.getCoordsOrigin();
+    const raw = t.qr_position.x != null ? Number(t.qr_position.x) : (t.qr_position.left != null ? Number(t.qr_position.left) - (baseW / 2) : 0);
+    return raw.toFixed(2);
+  }
+
+  getQrCoordY(): string {
+    const t = this.selectedTemplate();
+    if (!t?.qr_position) return '—';
+    const baseH = this.getBaseHeight();
+    const origin = this.getCoordsOrigin();
+    const raw = t.qr_position.y != null ? Number(t.qr_position.y) : (t.qr_position.top != null ? Number(t.qr_position.top) - (baseH / 2) : 0);
+    return raw.toFixed(2);
+  }
+
+  getNameSize(): string {
+    const t = this.selectedTemplate();
+    const s = Number(t?.name_position?.fontSize ?? 28);
+    return s.toFixed(2);
+  }
+
+  getDateSize(): string {
+    const t = this.selectedTemplate();
+    const s = Number(t?.date_position?.fontSize ?? 16);
+    return s.toFixed(2);
+  }
+
+  getQrSizeValue(): string {
+    const t = this.selectedTemplate();
+    const s = Number(t?.qr_position?.width ?? t?.qr_position?.size ?? t?.qr_position?.height ?? 120);
+    return s.toFixed(2);
+  }
+
+  // Eliminado generador de JPG en cliente según requerimiento
 }

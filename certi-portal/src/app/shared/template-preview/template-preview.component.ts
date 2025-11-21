@@ -7,7 +7,9 @@ export interface TemplatePreviewData {
   file_url?: string;
   qr_position?: any;
   name_position?: any;
+  date_position?: any;
   background_image_size?: any;
+  template_styles?: any;
 }
 
 @Component({
@@ -16,7 +18,13 @@ export interface TemplatePreviewData {
   imports: [CommonModule],
   template: `
     <div class="template-preview-container" [style.width.px]="containerWidth()" [style.height.px]="containerHeight()">
-      <div class="template-preview-wrapper" *ngIf="template?.file_url">
+      <div class="image-size-info">
+        <small>
+          Render: {{ imageWidth() }}×{{ imageHeight() }} px
+          | Base: {{ template?.background_image_size?.width || naturalW() }}×{{ template?.background_image_size?.height || naturalH() }} px
+        </small>
+      </div>
+      <div class="template-preview-wrapper" *ngIf="template?.file_url" [style.width.px]="imageWidth()" [style.height.px]="imageHeight()">
         <!-- Imagen de fondo -->
         <img
           [src]="template?.file_url"
@@ -29,17 +37,15 @@ export interface TemplatePreviewData {
 
         <!-- Elemento QR -->
         <div
-          *ngIf="template?.qr_position && showElements"
+          *ngIf="template?.qr_position && showElements && qrUrl"
           class="qr-element"
           [style.left.px]="getQrLeft()"
           [style.top.px]="getQrTop()"
           [style.width.px]="getQrSize()"
           [style.height.px]="getQrSize()"
+          [style.transform]="'rotate(' + getQrRotation() + 'deg)'"
         >
-          <div class="qr-placeholder">
-            <i class="fas fa-qrcode"></i>
-            <span>QR</span>
-          </div>
+          <img [src]="qrUrl" alt="QR" [style.width.px]="getQrSize()" [style.height.px]="getQrSize()" />
         </div>
 
         <!-- Elemento Nombre -->
@@ -51,8 +57,23 @@ export interface TemplatePreviewData {
           [style.font-size.px]="getNameFontSize()"
           [style.color]="getNameColor()"
           [style.font-family]="getNameFontFamily()"
+          [style.transform]="'rotate(' + getNameRotation() + 'deg)'"
         >
           {{ getNameText() }}
+        </div>
+
+        <!-- Elemento Fecha -->
+        <div
+          *ngIf="template?.date_position && showElements"
+          class="date-element"
+          [style.left.px]="getDateLeft()"
+          [style.top.px]="getDateTop()"
+          [style.font-size.px]="getDateFontSize()"
+          [style.color]="getDateColor()"
+          [style.font-family]="getDateFontFamily()"
+          [style.transform]="'rotate(' + getDateRotation() + 'deg)'"
+        >
+          {{ getDateText() }}
         </div>
       </div>
 
@@ -71,13 +92,23 @@ export interface TemplatePreviewData {
       overflow: hidden;
       background: #f8f9fa;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
+    }
+
+    .image-size-info {
+      position: absolute;
+      top: 4px;
+      left: 8px;
+      color: #6c757d;
+      font-size: 12px;
+      z-index: 10;
     }
 
     .template-preview-wrapper {
       position: relative;
       display: inline-block;
+      margin-top: 18px;
     }
 
     .template-background-image {
@@ -85,45 +116,16 @@ export interface TemplatePreviewData {
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
+      position: relative;
+      z-index: 0;
     }
 
-    .qr-element {
-      position: absolute;
-      border: 2px solid #007bff;
-      background: rgba(0, 123, 255, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-    }
+    .qr-element { position: absolute; z-index: 5; transform-origin: top left; }
 
-    .qr-placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #007bff;
-      font-size: 12px;
-      font-weight: bold;
-    }
 
-    .qr-placeholder i {
-      font-size: 16px;
-      margin-bottom: 2px;
-    }
+    .name-element { position: absolute; white-space: nowrap; z-index: 5; transform-origin: top left; }
 
-    .name-element {
-      position: absolute;
-      border: 2px solid #28a745;
-      background: rgba(40, 167, 69, 0.1);
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-weight: bold;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .date-element { position: absolute; white-space: nowrap; z-index: 5; transform-origin: top left; }
 
     .no-image-placeholder {
       display: flex;
@@ -148,12 +150,16 @@ export class TemplatePreviewComponent implements OnInit {
   @Input() maxHeight: number = 200;
   @Input() showElements: boolean = true;
   @Input() sampleUserName: string = 'Juan Pérez';
+  @Input() sampleDate: string = '01/01/2024';
+  @Input() qrUrl: string | null = null;
 
   containerWidth = signal(300);
   containerHeight = signal(200);
   imageWidth = signal(0);
   imageHeight = signal(0);
   imageLoaded = signal(false);
+  naturalW = signal(0);
+  naturalH = signal(0);
 
   ngOnInit() {
     this.containerWidth.set(this.maxWidth);
@@ -182,53 +188,82 @@ export class TemplatePreviewComponent implements OnInit {
     this.imageHeight.set(height);
     this.containerWidth.set(width);
     this.containerHeight.set(height);
+    this.naturalW.set(naturalWidth);
+    this.naturalH.set(naturalHeight);
     this.imageLoaded.set(true);
   }
 
   getQrLeft(): number {
     if (!this.template?.qr_position || !this.imageLoaded()) return 0;
-
-    const scaleX = this.getScaleX();
-    return (this.template.qr_position.left || 0) * scaleX;
+    const scaleX = this.getScaleXNatural();
+    const baseW = this.getBaseWidth();
+    const origin = this.getCoordsOrigin();
+    const hasLeft = this.template.qr_position.left != null;
+    const leftVal = Number(this.template.qr_position.left ?? 0);
+    const xVal = Number(this.template.qr_position.x ?? 0);
+    const posX = hasLeft ? leftVal : (origin === 'center' ? (xVal + (baseW / 2)) : xVal);
+    return posX * scaleX;
   }
 
   getQrTop(): number {
     if (!this.template?.qr_position || !this.imageLoaded()) return 0;
-
-    const scaleY = this.getScaleY();
-    return (this.template.qr_position.top || 0) * scaleY;
+    const scaleY = this.getScaleYNatural();
+    const baseH = this.getBaseHeight();
+    const origin = this.getCoordsOrigin();
+    const hasTop = this.template.qr_position.top != null;
+    const topVal = Number(this.template.qr_position.top ?? 0);
+    const yVal = Number(this.template.qr_position.y ?? 0);
+    const posY = hasTop ? topVal : (origin === 'center' ? (yVal + (baseH / 2)) : yVal);
+    return posY * scaleY;
   }
 
   getQrSize(): number {
     if (!this.template?.qr_position || !this.imageLoaded()) return 50;
+    const size = Number(this.template.qr_position.width || this.template.qr_position.size || 80);
+    const scaleX = this.getScaleXNatural();
+    return size * scaleX;
+  }
 
-    const scale = Math.min(this.getScaleX(), this.getScaleY());
-    return (this.template.qr_position.width || 80) * scale;
+  getQrRotation(): number {
+    return Number(this.template?.qr_position?.rotation || 0);
   }
 
   getNameLeft(): number {
     if (!this.template?.name_position || !this.imageLoaded()) return 0;
-
-    const scaleX = this.getScaleX();
-    return (this.template.name_position.left || 0) * scaleX;
+    const scaleX = this.getScaleXNatural();
+    const baseW = this.getBaseWidth();
+    const origin = this.getCoordsOrigin();
+    const hasLeft = this.template.name_position.left != null;
+    const leftVal = Number(this.template.name_position.left ?? 0);
+    const xVal = Number(this.template.name_position.x ?? 0);
+    const posX = hasLeft ? leftVal : (origin === 'center' ? (xVal + (baseW / 2)) : xVal);
+    return posX * scaleX;
   }
 
   getNameTop(): number {
     if (!this.template?.name_position || !this.imageLoaded()) return 0;
-
-    const scaleY = this.getScaleY();
-    return (this.template.name_position.top || 0) * scaleY;
+    const scaleY = this.getScaleYNatural();
+    const baseH = this.getBaseHeight();
+    const origin = this.getCoordsOrigin();
+    const hasTop = this.template.name_position.top != null;
+    const topVal = Number(this.template.name_position.top ?? 0);
+    const yVal = Number(this.template.name_position.y ?? 0);
+    const posY = hasTop ? topVal : (origin === 'center' ? (yVal + (baseH / 2)) : yVal);
+    return posY * scaleY;
   }
 
   getNameFontSize(): number {
     if (!this.template?.name_position || !this.imageLoaded()) return 16;
-
-    const scale = Math.min(this.getScaleX(), this.getScaleY());
-    return (this.template.name_position.fontSize || 24) * scale;
+    const size = Number(this.template.name_position.fontSize || 28);
+    const scale = this.getScaleXNatural();
+    return size * scale;
   }
 
+  // Sin recorte: se muestran posiciones tal cual, usando escala basada en background_image_size
+
   getNameColor(): string {
-    return this.template?.name_position?.fill || '#000000';
+    const np = this.template?.name_position;
+    return (np?.color ?? np?.fill ?? '#000000');
   }
 
   getNameFontFamily(): string {
@@ -239,13 +274,80 @@ export class TemplatePreviewComponent implements OnInit {
     return this.sampleUserName;
   }
 
-  private getScaleX(): number {
-    if (!this.template?.background_image_size || !this.imageLoaded()) return 1;
-    return this.imageWidth() / (this.template.background_image_size.width || this.imageWidth());
+  getDateLeft(): number {
+    if (!this.template?.date_position || !this.imageLoaded()) return 0;
+    const scaleX = this.getScaleXNatural();
+    const baseW = this.getBaseWidth();
+    const origin = this.getCoordsOrigin();
+    const hasLeft = this.template.date_position.left != null;
+    const leftVal = Number(this.template.date_position.left ?? 0);
+    const xVal = Number(this.template.date_position.x ?? 0);
+    const posX = hasLeft ? leftVal : (origin === 'center' ? (xVal + (baseW / 2)) : xVal);
+    return posX * scaleX;
   }
 
-  private getScaleY(): number {
-    if (!this.template?.background_image_size || !this.imageLoaded()) return 1;
-    return this.imageHeight() / (this.template.background_image_size.height || this.imageHeight());
+  getDateTop(): number {
+    if (!this.template?.date_position || !this.imageLoaded()) return 0;
+    const scaleY = this.getScaleYNatural();
+    const baseH = this.getBaseHeight();
+    const origin = this.getCoordsOrigin();
+    const hasTop = this.template.date_position.top != null;
+    const topVal = Number(this.template.date_position.top ?? 0);
+    const yVal = Number(this.template.date_position.y ?? 0);
+    const posY = hasTop ? topVal : (origin === 'center' ? (yVal + (baseH / 2)) : yVal);
+    return posY * scaleY;
+  }
+
+  getDateFontSize(): number {
+    if (!this.template?.date_position || !this.imageLoaded()) return 14;
+    const size = Number(this.template.date_position.fontSize || 16);
+    const scale = this.getScaleXNatural();
+    return size * scale;
+  }
+
+  getDateColor(): string {
+    const dp = this.template?.date_position;
+    return (dp?.color ?? dp?.fill ?? '#333333');
+  }
+
+  getDateFontFamily(): string {
+    return this.template?.date_position?.fontFamily || 'Arial';
+  }
+
+  getDateText(): string {
+    return this.sampleDate;
+  }
+
+  private getScaleXNatural(): number {
+    if (!this.imageLoaded()) return 1;
+    const base = Number(this.template?.background_image_size?.width || this.naturalW() || this.imageWidth());
+    return base ? this.imageWidth() / base : 1;
+  }
+
+  private getScaleYNatural(): number {
+    if (!this.imageLoaded()) return 1;
+    const base = Number(this.template?.background_image_size?.height || this.naturalH() || this.imageHeight());
+    return base ? this.imageHeight() / base : 1;
+  }
+
+  private getBaseWidth(): number {
+    return Number(this.template?.background_image_size?.width || this.naturalW() || this.imageWidth());
+  }
+
+  private getBaseHeight(): number {
+    return Number(this.template?.background_image_size?.height || this.naturalH() || this.imageHeight());
+  }
+
+  private getCoordsOrigin(): 'center' | 'left-top' {
+    const origin = String(this.template?.template_styles?.coords_origin || 'center').toLowerCase();
+    return origin === 'left-top' ? 'left-top' : 'center';
+  }
+
+  getNameRotation(): number {
+    return Number(this.template?.name_position?.rotation || 0);
+  }
+
+  getDateRotation(): number {
+    return Number(this.template?.date_position?.rotation || 0);
   }
 }

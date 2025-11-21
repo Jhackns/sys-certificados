@@ -30,11 +30,13 @@ return new class extends Migration
                 // Campos para almacenar las coordenadas y configuración del nombre del usuario
                 $table->json('name_position')->nullable()->comment('Posición y configuración del texto del nombre (x, y, width, height, font, size)');
 
+                // Campo para almacenar las coordenadas y configuración de la fecha
+                $table->json('date_position')->nullable()->comment('Posición y configuración del texto de la fecha (x, y, font, size, color)');
+
                 // Campo para almacenar el tamaño original de la imagen de fondo
                 $table->json('background_image_size')->nullable()->comment('Tamaño original de la imagen de fondo (width, height)');
 
-                // Campo para la integración con Canva
-                $table->string('canva_design_id')->nullable()->comment('ID del diseño en Canva para generación automática');
+                
 
                 $table->timestamps();
             });

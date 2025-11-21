@@ -135,9 +135,9 @@ class CertificateService
                     $this->generateVerificationData($certificate);
                     Log::info('Datos de verificación y QR generados exitosamente');
 
-                    // Despachar el trabajo para generar el certificado con Canva
+                    // Despachar el trabajo para generar imagen/documento del certificado
                     Log::info('Despachando trabajo para generar certificado en segundo plano');
-                    GenerateCertificateJob::dispatch($certificate, false); // false = no enviar email automáticamente
+                    GenerateCertificateJob::dispatch($certificate, false)->afterCommit(); // false = no enviar email automáticamente
                     Log::info('Trabajo despachado exitosamente');
                 } else {
                     Log::error('Certificate::create() retornó null');

@@ -7,12 +7,12 @@ use App\Http\Requests\CertificateTemplateRequest;
 use App\Models\CertificateTemplate;
 use App\Services\CertificateTemplateService;
 use App\Services\CertificateFileService;
-use App\Services\CanvaValidationService;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
 class CertificateTemplateController extends Controller
@@ -21,16 +21,13 @@ class CertificateTemplateController extends Controller
 
     protected $templateService;
     protected $fileService;
-    protected $canvaValidationService;
 
     public function __construct(
         CertificateTemplateService $templateService,
         CertificateFileService $fileService,
-        CanvaValidationService $canvaValidationService
     ) {
         $this->templateService = $templateService;
         $this->fileService = $fileService;
-        $this->canvaValidationService = $canvaValidationService;
     }
 
     /**
@@ -79,7 +76,6 @@ class CertificateTemplateController extends Controller
                         'status' => $template->status,
                         'is_active' => $template->is_active,
                         'certificates_count' => $template->certificates_count,
-                        'canva_design_id' => $template->canva_design_id,
                         'created_at' => $template->created_at,
                         'updated_at' => $template->updated_at,
                     ];
@@ -99,6 +95,52 @@ class CertificateTemplateController extends Controller
         }
     }
 
+    public function list(Request $request): JsonResponse
+    {
+        try {
+            $templates = CertificateTemplate::select('id', 'name', 'description')
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+
+            return $this->successResponse([
+                'templates' => $templates
+            ], 'Lista de plantillas obtenida correctamente');
+        } catch (\Exception $e) {
+            Log::error('Error al obtener lista de plantillas: ' . $e->getMessage());
+            return $this->errorResponse('Error al obtener lista de plantillas', Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Listar fuentes disponibles desde storage/app/fonts
+     */
+    public function fonts(): JsonResponse
+    {
+        try {
+            $dir1 = storage_path('app/fonts');
+            $dir2 = storage_path('app/public/fonts');
+            $fonts = [];
+            foreach ([$dir1, $dir2] as $dir) {
+                if (is_dir($dir)) {
+                    $files = array_merge(glob($dir . '/*.ttf') ?: [], glob($dir . '/*.otf') ?: []);
+                    foreach ($files as $file) {
+                        $base = pathinfo($file, PATHINFO_FILENAME);
+                        $name = trim(preg_replace('/[_-]+/', ' ', $base));
+                        $name = preg_replace('/\s+/', ' ', $name);
+                        $fonts[] = $name;
+                    }
+                }
+            }
+            sort($fonts, SORT_NATURAL | SORT_FLAG_CASE);
+            $fonts = array_values(array_unique($fonts));
+            return $this->successResponse([ 'fonts' => $fonts ], 'Fuentes disponibles obtenidas correctamente');
+        } catch (\Throwable $e) {
+            Log::error('Error al listar fuentes: ' . $e->getMessage());
+            return $this->errorResponse('Error al listar fuentes', Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     /**
      * Obtener vista previa de una plantilla
      *
@@ -110,16 +152,24 @@ class CertificateTemplateController extends Controller
         try {
             $template = CertificateTemplate::findOrFail($id);
 
+            $computedUrl = $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null;
+            Log::info('Plantilla::preview', [
+                'id' => $template->id,
+                'file_path' => $template->file_path,
+                'file_url' => $computedUrl,
+                'exists_certificates' => $template->file_path ? Storage::disk('certificates')->exists($template->file_path) : false,
+                'exists_public' => $template->file_path ? Storage::disk('public')->exists($template->file_path) : false,
+            ]);
+
             return $this->successResponse([
                 'template' => [
                     'id' => $template->id,
                     'name' => $template->name,
                     'description' => $template->description,
                     'file_path' => $template->file_path,
-                    'file_url' => $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null,
+                    'file_url' => $computedUrl,
                     'activity_type' => $template->activity_type,
                     'status' => $template->status,
-                    'canva_design_id' => $template->canva_design_id,
                     'created_at' => $template->created_at,
                     'updated_at' => $template->updated_at,
                 ]
@@ -145,29 +195,19 @@ class CertificateTemplateController extends Controller
 
             $data = $request->validated();
 
-            // Validar design ID de Canva si se proporciona
-            if (!empty($data['canva_design_id'])) {
-                $validation = $this->canvaValidationService->validateDesignId($data['canva_design_id']);
+            // Eliminada validación de design ID de Canva
 
-                if (!$validation['valid']) {
-                    return $this->errorResponse(
-                        'Design ID de Canva inválido: ' . $validation['message'],
-                        Response::HTTP_BAD_REQUEST
-                    );
-                }
-
-                Log::info('Design ID de Canva validado exitosamente', [
-                    'design_id' => $data['canva_design_id'],
-                    'validation_data' => $validation['data'] ?? []
-                ]);
-            }
-
-            // Manejar la subida de archivo si existe
+            // Manejar la subida de archivo si existe (guardar en disco público)
             if ($request->hasFile('template_file')) {
                 $file = $request->file('template_file');
-                $templateName = $data['name'] ?? 'template';
-                $filePath = $this->fileService->uploadGlobalTemplate($file, $templateName);
+                $filePath = $file->store('templates', 'public');
                 $data['file_path'] = $filePath;
+                // Calcular tamaño natural de la imagen
+                $abs = storage_path('app/public/' . ltrim($filePath, '/'));
+                $size = @getimagesize($abs);
+                if ($size) {
+                    $data['background_image_size'] = [ 'width' => $size[0], 'height' => $size[1] ];
+                }
             }
 
             // Crear la plantilla
@@ -179,18 +219,7 @@ class CertificateTemplateController extends Controller
                 Log::info('Plantilla creada por usuario', [
                     'template_id' => $template->id,
                     'user_id' => $user->id,
-                    'canva_design_id' => $template->canva_design_id ?? null
                 ]);
-
-                // Crear el registro en la tabla pivote
-                // DB::table('certificate_template_user')->insert([
-                //     'template_id' => $template->id,
-                //     'user_id' => $user->id,
-                //     'canva_design_id' => $template->canva_design_id ?? null
-                // ]);
-
-                // El usuario creador se guarda automáticamente en el campo user_id si existe
-                // No necesitamos la relación owners por ahora
             }
 
             return $this->successResponse([
@@ -202,7 +231,6 @@ class CertificateTemplateController extends Controller
                     'file_url' => $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null,
                     'activity_type' => $template->activity_type,
                     'status' => $template->status,
-                    'canva_design_id' => $template->canva_design_id,
                     'created_at' => $template->created_at,
                     'updated_at' => $template->updated_at,
                 ]
@@ -230,21 +258,33 @@ class CertificateTemplateController extends Controller
                 ->withCount('certificates')
                 ->findOrFail($id);
 
+            $computedUrl = $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null;
+            Log::info('Plantilla::show', [
+                'id' => $template->id,
+                'file_path' => $template->file_path,
+                'file_url' => $computedUrl,
+                'exists_certificates' => $template->file_path ? Storage::disk('certificates')->exists($template->file_path) : false,
+                'exists_public' => $template->file_path ? Storage::disk('public')->exists($template->file_path) : false,
+            ]);
+
             return $this->successResponse([
                 'template' => [
                     'id' => $template->id,
                     'name' => $template->name,
                     'description' => $template->description,
                     'file_path' => $template->file_path,
-                    'file_url' => $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null,
+                    'file_url' => $computedUrl,
                     'activity_type' => $template->activity_type,
                     'status' => $template->status,
                     'is_active' => $template->is_active,
                     'certificates_count' => $template->certificates_count,
-                    'canva_design_id' => $template->canva_design_id,
+                    'name_position' => $template->name_position,
+                    'date_position' => $template->date_position,
+                    'qr_position' => $template->qr_position,
+                    'template_styles' => $template->template_styles,
+                    'background_image_size' => $template->background_image_size,
                     'created_at' => $template->created_at,
                     'updated_at' => $template->updated_at,
-                    // Eliminada la información de owners por ahora
                 ]
             ], 'Plantilla obtenida exitosamente');
         } catch (\Exception $e) {
@@ -266,29 +306,24 @@ class CertificateTemplateController extends Controller
             $template = CertificateTemplate::findOrFail($id);
             $data = $request->validated();
 
-            // Validar design ID de Canva si se proporciona
-            if (!empty($data['canva_design_id'])) {
-                $validation = $this->canvaValidationService->validateDesignId($data['canva_design_id']);
+            // Eliminada validación de design ID de Canva
 
-                if (!$validation['valid']) {
-                    return $this->errorResponse(
-                        'Design ID de Canva inválido: ' . $validation['message'],
-                        Response::HTTP_BAD_REQUEST
-                    );
-                }
-            }
-
-            // Manejar la subida de archivo si existe
+            // Manejar la subida de archivo si existe (guardar en disco público)
             if ($request->hasFile('template_file')) {
-                // Eliminar archivo anterior si existe
+                // Eliminar archivo anterior si existe en disco público
                 if ($template->file_path) {
-                    $this->fileService->deleteFile($template->file_path);
+                    Storage::disk('public')->delete($template->file_path);
                 }
 
                 $file = $request->file('template_file');
-                $templateName = $data['name'] ?? $template->name;
-                $filePath = $this->fileService->uploadGlobalTemplate($file, $templateName);
+                $filePath = $file->store('templates', 'public');
                 $data['file_path'] = $filePath;
+                // Calcular tamaño natural de la imagen
+                $abs = storage_path('app/public/' . ltrim($filePath, '/'));
+                $size = @getimagesize($abs);
+                if ($size) {
+                    $data['background_image_size'] = [ 'width' => $size[0], 'height' => $size[1] ];
+                }
             }
 
             $template = $this->templateService->update($template, $data);
@@ -302,7 +337,10 @@ class CertificateTemplateController extends Controller
                     'file_url' => $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null,
                     'activity_type' => $template->activity_type,
                     'status' => $template->status,
-                    'canva_design_id' => $template->canva_design_id,
+                    'name_position' => $template->name_position,
+                    'qr_position' => $template->qr_position,
+                    'background_image_size' => $template->background_image_size,
+                    'template_styles' => $template->template_styles,
                     'created_at' => $template->created_at,
                     'updated_at' => $template->updated_at,
                 ]
@@ -352,56 +390,5 @@ class CertificateTemplateController extends Controller
      * @param Request $request
      * @return JsonResponse
      */
-    public function validateCanvaDesign(Request $request): JsonResponse
-    {
-        try {
-            Log::info('Validación de diseño de Canva solicitada', $request->all());
-
-            $request->validate([
-                'canva_design_id' => 'required|string'
-            ]);
-
-            $designId = $request->input('canva_design_id');
-            Log::info('Procesando diseño', ['design_id' => $designId]);
-
-            // Primero intentar extraer el ID del diseño si es una URL
-            $extractedId = $this->canvaValidationService->extractDesignIdFromUrl($designId);
-
-            if ($extractedId) {
-                Log::info('ID extraído de URL', ['original' => $designId, 'extracted_id' => $extractedId]);
-                // Si se extrajo un ID de la URL, usar ese ID
-                $validation = $this->canvaValidationService->validateDesignId($extractedId);
-            } else {
-                Log::info('Usando ID directo', ['design_id' => $designId]);
-                // Si no es una URL, asumir que es un ID directo
-                $validation = $this->canvaValidationService->validateDesignId($designId);
-            }
-
-            Log::info('Resultado de validación', $validation);
-
-            if ($validation['valid']) {
-                return $this->successResponse([
-                    'valid' => true,
-                    'status' => $validation['status'] ?? 'valid',
-                    'message' => $validation['message'],
-                    'data' => $validation['data'] ?? null
-                ], 'Diseño validado exitosamente');
-            } else {
-                return $this->errorResponse($validation['message'], Response::HTTP_BAD_REQUEST, [
-                    'status' => $validation['status'] ?? 'invalid',
-                    'details' => $validation['data'] ?? null
-                ]);
-            }
-
-        } catch (\Exception $e) {
-            Log::error('Error al validar diseño de Canva: ' . $e->getMessage(), [
-                'exception' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return $this->errorResponse('Error al validar diseño de Canva', Response::HTTP_INTERNAL_SERVER_ERROR, [
-                'status' => 'server_error',
-                'details' => $e->getMessage()
-            ]);
-        }
-    }
+    // Método de validación de Canva eliminado
 }

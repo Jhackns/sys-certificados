@@ -1,4 +1,4 @@
-import { Component, signal, OnInit } from '@angular/core';
+import { Component, signal, OnInit, HostListener, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
@@ -33,10 +33,38 @@ export class TemplatesComponent implements OnInit {
   successMessage = signal<string>('');
   errorMessage = signal<string>('');
 
-  // Validación de Canva
-  isValidatingCanvaLink = signal(false);
-  canvaLinkValidated = signal(false);
-  canvaLinkValid = signal(false);
+  private _successTimer: any;
+  private _errorTimer: any;
+
+  // Efecto para auto-ocultar mensajes; debe crearse en contexto de inyección
+  private autoHideEffect = effect(() => {
+    const s = this.successMessage();
+    if (s) {
+      if (this._successTimer) clearTimeout(this._successTimer);
+      this._successTimer = setTimeout(() => this.successMessage.set(''), 5000);
+    }
+    const e = this.errorMessage();
+    if (e) {
+      if (this._errorTimer) clearTimeout(this._errorTimer);
+      this._errorTimer = setTimeout(() => this.errorMessage.set(''), 5000);
+    }
+  });
+
+  // Subida de imagen y editor visual
+  uploadedFile: File | null = null;
+  uploadedPreviewUrl: string | null = null;
+  isDragging = false;
+  dragOffset = { x: 0, y: 0 };
+  backgroundOffset = signal<{ x: number; y: number }>({ x: 0, y: 0 });
+  backgroundImageSize = signal<{ width: number; height: number } | null>(null);
+  editorCanvasSize = signal<{ width: number; height: number } | null>(null);
+  showEditor = signal(false);
+  editorElements = signal<{ type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string }[]>([]);
+  selectedElementIndex = signal<number | null>(null);
+  availableFonts = signal<string[]>([]);
+  private fallbackFonts: string[] = [
+    'Arial','Helvetica','Times New Roman','Courier New','Verdana','Georgia','Trebuchet MS','Tahoma','Calibri','Cambria','Segoe UI','Garamond','Bookman','Palatino','Comic Sans MS'
+  ];
 
   // Referencia a Math para usar en la plantilla
   Math = Math;
@@ -71,15 +99,14 @@ export class TemplatesComponent implements OnInit {
       name: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(255)]],
       description: ['', [Validators.maxLength(1000)]],
       activity_type: ['other', [Validators.required]],
-      status: ['active', [Validators.required]],
-      canva_design_id: ['', Validators.required]
+      status: ['active', [Validators.required]]
     });
   }
 
   ngOnInit(): void {
     this.loadTemplates();
     this.setupFilterSubscription();
-    this.setupMessageAutoHide();
+    this.loadAvailableFonts();
   }
 
   private setupFilterSubscription(): void {
@@ -101,58 +128,51 @@ export class TemplatesComponent implements OnInit {
     });
   }
 
-  private setupMessageAutoHide(): void {
-    // Auto-hide success messages
-    setInterval(() => {
-      if (this.successMessage()) {
-        setTimeout(() => this.successMessage.set(''), 5000);
+  async loadAvailableFonts(): Promise<void> {
+    try {
+      const res = await this.templateService.getFonts().toPromise();
+      let fonts = res?.data?.fonts || [];
+      if (!fonts || fonts.length === 0) {
+        fonts = [...this.fallbackFonts];
       }
-      if (this.errorMessage()) {
-        setTimeout(() => this.errorMessage.set(''), 5000);
-      }
-    }, 100);
+      const sorted = fonts.sort((a: string, b: string) => a.localeCompare(b));
+      this.availableFonts.set(sorted);
+    } catch (e) {
+      this.availableFonts.set([...this.fallbackFonts]);
+    }
   }
 
-  // Validar enlace de Canva
-  validateCanvaLink(): void {
-    const canvaLink = this.templateForm.get('canva_design_id')?.value;
+  // Eliminado: el efecto ahora se declara como propiedad de clase
 
-    if (!canvaLink) {
-      this.canvaLinkValid.set(false);
-      this.canvaLinkValidated.set(true);
+  // Manejo de subida de imagen
+  onTemplateFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) {
       return;
     }
-
-    this.isValidatingCanvaLink.set(true);
-    this.canvaLinkValidated.set(false);
-
-    // Extraer el ID de diseño del enlace si es una URL completa
-    let designId = canvaLink;
-    if (canvaLink.includes('canva.com/design/')) {
-      const match = canvaLink.match(/\/design\/([^\/]+)/);
-      if (match && match[1]) {
-        designId = match[1];
-      }
+    const file = input.files[0];
+    if (!file.type.startsWith('image/')) {
+      this.errorMessage.set('Selecciona un archivo de imagen válido (JPG/PNG).');
+      return;
     }
+    this.uploadedFile = file;
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.uploadedPreviewUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        this.backgroundImageSize.set({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.src = this.uploadedPreviewUrl as string;
+    };
+    reader.readAsDataURL(file);
+  }
 
-    // Simular una validación con el servicio de Canva
-    this.templateService.validateCanvaDesign(designId).subscribe({
-      next: (response) => {
-        this.isValidatingCanvaLink.set(false);
-        this.canvaLinkValidated.set(true);
-        this.canvaLinkValid.set(response.success);
-
-        // Actualizar el valor en el formulario con el ID extraído
-        if (response.success && designId !== canvaLink) {
-          this.templateForm.get('canva_design_id')?.setValue(designId, { emitEvent: false });
-        }
-      },
-      error: () => {
-        this.isValidatingCanvaLink.set(false);
-        this.canvaLinkValidated.set(true);
-        this.canvaLinkValid.set(false);
-      }
-    });
+  removeSelectedImage(): void {
+    this.uploadedFile = null;
+    this.uploadedPreviewUrl = null;
+    this.editorElements.set([]);
+    this.selectedElementIndex.set(null);
   }
 
   loadTemplates(): void {
@@ -226,10 +246,7 @@ export class TemplatesComponent implements OnInit {
     this.showCreateModal.set(true);
     this.clearMessages();
 
-    // Limpiar validación de Canva
-    this.canvaLinkValidated.set(false);
-    this.canvaLinkValid.set(false);
-    this.isValidatingCanvaLink.set(false);
+    this.removeSelectedImage();
   }
 
   openEditModal(template: Template): void {
@@ -242,12 +259,60 @@ export class TemplatesComponent implements OnInit {
     });
     this.showEditModal.set(true);
     this.clearMessages();
+    this.templateService.getTemplate(template.id).subscribe({
+      next: (res) => {
+        const full = res?.data?.template || template;
+          this.selectedTemplate.set(full);
+          this.uploadedPreviewUrl = (full?.file_url || full?.file_path || this.uploadedPreviewUrl);
+          const offX = Number(full?.template_styles?.background_offset?.x ?? 0);
+          const offY = Number(full?.template_styles?.background_offset?.y ?? 0);
+        this.backgroundOffset.set({ x: Math.round(offX), y: Math.round(offY) });
+        const els: { type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string }[] = [];
+        const namePos = (full as any)?.name_position;
+        if (namePos) {
+          const x = namePos.x != null ? Number(namePos.x) : (namePos.left != null ? Number(namePos.left) : null);
+          const y = namePos.y != null ? Number(namePos.y) : (namePos.top != null ? Number(namePos.top) : null);
+          if (x != null && y != null) {
+            els.push({ type: 'name', x: Math.round(x), y: Math.round(y), fontFamily: String(namePos.fontFamily || 'Arial'), fontSize: Number(namePos.fontSize || 28), rotation: Number(namePos.rotation || 0), color: String(namePos.color || '#000') });
+          }
+        }
+        const datePos = (full as any)?.date_position;
+        if (datePos) {
+          const x = datePos.x != null ? Number(datePos.x) : (datePos.left != null ? Number(datePos.left) : null);
+          const y = datePos.y != null ? Number(datePos.y) : (datePos.top != null ? Number(datePos.top) : null);
+          if (x != null && y != null) {
+            els.push({ type: 'date', x: Math.round(x), y: Math.round(y), fontFamily: String(datePos.fontFamily || 'Arial'), fontSize: Number(datePos.fontSize || 16), rotation: Number(datePos.rotation || 0), color: String(datePos.color || '#333') });
+          }
+        }
+        const qrPos = (full as any)?.qr_position;
+        if (qrPos) {
+          const x = qrPos.x != null ? Number(qrPos.x) : (qrPos.left != null ? Number(qrPos.left) : null);
+          const y = qrPos.y != null ? Number(qrPos.y) : (qrPos.top != null ? Number(qrPos.top) : null);
+          if (x != null && y != null) {
+            els.push({ type: 'qr', x: Math.round(x), y: Math.round(y), width: Number(qrPos.width || qrPos.size || 120), height: Number(qrPos.height || qrPos.size || 120), rotation: Number(qrPos.rotation || 0) });
+          }
+        }
+        if (els.length) {
+          this.editorElements.set(els);
+          this.selectedElementIndex.set(0);
+        }
+      },
+      error: () => {}
+    });
   }
 
   openDeleteModal(template: Template): void {
+    this.clearMessages();
+    // Si la plantilla tiene certificados asociados, impedir eliminación y mostrar mensaje
+    const count = (template as any).certificates_count || 0;
+    if (count > 0) {
+      this.errorMessage.set('No se puede eliminar una plantilla que tiene certificados asociados (' + count + ').');
+      this.showDeleteModal.set(false);
+      this.selectedTemplate.set(null);
+      return;
+    }
     this.selectedTemplate.set(template);
     this.showDeleteModal.set(true);
-    this.clearMessages();
   }
 
   closeModals(): void {
@@ -260,10 +325,7 @@ export class TemplatesComponent implements OnInit {
       status: 'active'
     });
 
-    // Limpiar validación de Canva
-    this.canvaLinkValidated.set(false);
-    this.canvaLinkValid.set(false);
-    this.isValidatingCanvaLink.set(false);
+    this.removeSelectedImage();
   }
 
   clearMessages(): void {
@@ -319,33 +381,162 @@ export class TemplatesComponent implements OnInit {
       this.errorMessage.set('Por favor completa todos los campos requeridos');
       return;
     }
+    // Validar que se haya subido imagen y agregado Nombres
+    const hasName = this.editorElements().some(el => el.type === 'name');
+    if (!this.uploadedFile) {
+      this.errorMessage.set('Debes subir una imagen de fondo de plantilla.');
+      return;
+    }
+    if (!hasName) {
+      this.errorMessage.set('Debes agregar y posicionar el cuadro de Nombres.');
+      return;
+    }
 
     this.isLoading.set(true);
     this.errorMessage.set('');
 
-    // Crear objeto con los datos del formulario
-    const templateData = {
-      name: this.templateForm.get('name')?.value,
-      description: this.templateForm.get('description')?.value,
-      activity_type: this.templateForm.get('activity_type')?.value,
-      status: this.templateForm.get('status')?.value,
-      canva_design_id: this.templateForm.get('canva_design_id')?.value
-    };
+    const formData = new FormData();
+    formData.append('name', this.templateForm.get('name')?.value);
+    formData.append('description', this.templateForm.get('description')?.value || '');
+    formData.append('activity_type', this.templateForm.get('activity_type')?.value);
+    formData.append('status', this.templateForm.get('status')?.value);
+    formData.append('template_file', this.uploadedFile);
+    const bgSize = this.backgroundImageSize();
+    if (bgSize) {
+      formData.append('background_image_size[width]', String(bgSize.width));
+      formData.append('background_image_size[height]', String(bgSize.height));
+    }
 
-    this.templateService.createTemplate(templateData).subscribe({
+    const canvasSize = this.editorCanvasSize();
+    if (canvasSize) {
+      formData.append('template_styles[editor_canvas_size][width]', String(Math.round(canvasSize.width)));
+      formData.append('template_styles[editor_canvas_size][height]', String(Math.round(canvasSize.height)));
+    }
+    formData.append('template_styles[coords_origin]', 'center');
+
+    // Incluir desplazamiento del fondo en estilos de plantilla
+    const bgOffCreate = this.backgroundOffset();
+    formData.append('template_styles[background_offset][x]', String(Math.round(bgOffCreate.x)));
+    formData.append('template_styles[background_offset][y]', String(Math.round(bgOffCreate.y)));
+    // Guardar componentes existentes (name/date/qr)
+    this.editorElements().forEach(el => {
+      formData.append('template_styles[components][]', el.type);
+    });
+
+    const nameEl = this.editorElements().find(el => el.type === 'name')!;
+    const dateEl = this.editorElements().find(el => el.type === 'date');
+    const qrEl = this.editorElements().find(el => el.type === 'qr');
+
+    const namePosCreate = this.computeOriginAdjusted(nameEl!);
+    formData.append('name_position[x]', String(namePosCreate.x));
+    formData.append('name_position[y]', String(namePosCreate.y));
+    formData.append('name_position[fontSize]', String(nameEl.fontSize || 28));
+    formData.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
+    formData.append('name_position[color]', String(nameEl.color || '#000'));
+    formData.append('name_position[rotation]', String(nameEl.rotation || 0));
+
+    if (dateEl) {
+      const datePosCreate = this.computeOriginAdjusted(dateEl);
+      formData.append('date_position[x]', String(datePosCreate.x));
+      formData.append('date_position[y]', String(datePosCreate.y));
+      formData.append('date_position[fontSize]', String(dateEl.fontSize || 16));
+      formData.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
+      formData.append('date_position[color]', String(dateEl.color || '#333'));
+      formData.append('date_position[rotation]', String(dateEl.rotation || 0));
+    }
+
+    if (qrEl) {
+      const qrPosCreate = this.computeOriginAdjusted(qrEl);
+      formData.append('qr_position[x]', String(qrPosCreate.x));
+      formData.append('qr_position[y]', String(qrPosCreate.y));
+      formData.append('qr_position[width]', String(qrEl.width || 120));
+      formData.append('qr_position[height]', String(qrEl.height || 120));
+      formData.append('qr_position[rotation]', String(qrEl.rotation || 0));
+    }
+
+    this.templateService.createTemplate(formData).subscribe({
       next: (response) => {
-        this.isLoading.set(false);
-        if (response.success) {
-          this.successMessage.set('Plantilla creada exitosamente');
-          this.closeModals();
-          this.loadTemplates();
+        const createdId = (response as any)?.data?.template?.id;
+        if (response.success && createdId) {
+          const fd = new FormData();
+          fd.append('_method', 'PUT');
+          const bg = this.backgroundOffset();
+          fd.append('template_styles[background_offset][x]', String(Math.round(bg.x)));
+          fd.append('template_styles[background_offset][y]', String(Math.round(bg.y)));
+          const bgSz = this.backgroundImageSize();
+          if (bgSz) {
+            fd.append('background_image_size[width]', String(bgSz.width));
+            fd.append('background_image_size[height]', String(bgSz.height));
+          }
+          fd.append('template_styles[coords_origin]', 'center');
+          const nameElUpd = this.editorElements().find(el => el.type === 'name');
+          const dateElUpd = this.editorElements().find(el => el.type === 'date');
+          const qrElUpd = this.editorElements().find(el => el.type === 'qr');
+          if (nameElUpd) {
+            const namePosUpd = this.computeOriginAdjusted(nameElUpd);
+            fd.append('name_position[x]', String(namePosUpd.x));
+            fd.append('name_position[y]', String(namePosUpd.y));
+            fd.append('name_position[fontSize]', String(nameElUpd.fontSize || 28));
+            fd.append('name_position[fontFamily]', String(nameElUpd.fontFamily || 'Arial'));
+            fd.append('name_position[color]', String(nameElUpd.color || '#000'));
+            fd.append('name_position[rotation]', String(nameElUpd.rotation || 0));
+            fd.append('name_position[textAlign]', 'left');
+          }
+          if (dateElUpd) {
+            const datePosUpd = this.computeOriginAdjusted(dateElUpd);
+            fd.append('date_position[x]', String(datePosUpd.x));
+            fd.append('date_position[y]', String(datePosUpd.y));
+            fd.append('date_position[fontSize]', String(dateElUpd.fontSize || 16));
+            fd.append('date_position[fontFamily]', String(dateElUpd.fontFamily || 'Arial'));
+            fd.append('date_position[color]', String(dateElUpd.color || '#333'));
+            fd.append('date_position[rotation]', String(dateElUpd.rotation || 0));
+            fd.append('date_position[textAlign]', 'left');
+          }
+          if (qrElUpd) {
+            const qrPosUpd = this.computeOriginAdjusted(qrElUpd);
+            fd.append('qr_position[x]', String(qrPosUpd.x));
+            fd.append('qr_position[y]', String(qrPosUpd.y));
+            fd.append('qr_position[width]', String(qrElUpd.width || 120));
+            fd.append('qr_position[height]', String(qrElUpd.height || 120));
+            fd.append('qr_position[rotation]', String(qrElUpd.rotation || 0));
+          }
+          this.templateService.updateTemplate(createdId, fd).subscribe({
+            next: (updRes) => {
+              this.isLoading.set(false);
+              if (updRes.success) {
+                this.successMessage.set('Plantilla creada y posiciones guardadas');
+                this.closeModals();
+                this.loadTemplates();
+              } else {
+                this.errorMessage.set(updRes.message || 'Plantilla creada, pero no se guardaron posiciones');
+              }
+            },
+            error: (updErr) => {
+              this.isLoading.set(false);
+              this.errorMessage.set(updErr?.error?.message || 'Plantilla creada, error al guardar posiciones');
+              console.error('Error updating positions after create:', updErr);
+            }
+          });
         } else {
-          this.errorMessage.set(response.message || 'Error al crear plantilla');
+          this.isLoading.set(false);
+          if (response.success) {
+            this.successMessage.set('Plantilla creada exitosamente');
+            this.closeModals();
+            this.loadTemplates();
+          } else {
+            this.errorMessage.set(response.message || 'Error al crear plantilla');
+          }
         }
       },
       error: (error) => {
         this.isLoading.set(false);
-        this.errorMessage.set('Error al crear plantilla');
+        if (error?.status === 422) {
+          const errs = error?.error?.errors || {};
+          const messages = Object.keys(errs).map(k => Array.isArray(errs[k]) ? errs[k].join(' ') : String(errs[k]));
+          this.errorMessage.set(messages.length ? messages[0] : (error?.error?.message || 'Datos inválidos (422)'));
+        } else {
+          this.errorMessage.set(error?.error?.message || 'Error al crear plantilla');
+        }
         console.error('Error creating template:', error);
       }
     });
@@ -361,19 +552,73 @@ export class TemplatesComponent implements OnInit {
     this.isLoading.set(true);
     this.clearMessages();
 
-    // Crear objeto con los datos del formulario
-    const templateData = {
-      name: this.templateForm.get('name')?.value,
-      description: this.templateForm.get('description')?.value,
-      activity_type: this.templateForm.get('activity_type')?.value,
-      status: this.templateForm.get('status')?.value,
-      canva_design_id: this.templateForm.get('canva_design_id')?.value,
-      _method: 'PUT'
-    };
+    const formData = new FormData();
+    formData.append('name', this.templateForm.get('name')?.value);
+    formData.append('description', this.templateForm.get('description')?.value || '');
+    formData.append('activity_type', this.templateForm.get('activity_type')?.value);
+    formData.append('status', this.templateForm.get('status')?.value);
+    formData.append('_method', 'PUT');
+
+    if (this.uploadedFile) {
+      formData.append('template_file', this.uploadedFile);
+    }
+    const bgSizeUpd = this.backgroundImageSize();
+    if (bgSizeUpd) {
+      formData.append('background_image_size[width]', String(bgSizeUpd.width));
+      formData.append('background_image_size[height]', String(bgSizeUpd.height));
+    }
+
+    const canvasUpd = this.editorCanvasSize();
+    if (canvasUpd) {
+      formData.append('template_styles[editor_canvas_size][width]', String(Math.round(canvasUpd.width)));
+      formData.append('template_styles[editor_canvas_size][height]', String(Math.round(canvasUpd.height)));
+    }
+    formData.append('template_styles[coords_origin]', 'center');
+
+    const hasEditor = this.editorElements().length > 0;
+    if (hasEditor) {
+      const bgOffUpdate = this.backgroundOffset();
+      formData.append('template_styles[background_offset][x]', String(Math.round(bgOffUpdate.x)));
+      formData.append('template_styles[background_offset][y]', String(Math.round(bgOffUpdate.y)));
+      this.editorElements().forEach(el => {
+        formData.append('template_styles[components][]', el.type);
+      });
+
+      const nameEl = this.editorElements().find(el => el.type === 'name');
+      const dateEl = this.editorElements().find(el => el.type === 'date');
+      const qrEl = this.editorElements().find(el => el.type === 'qr');
+
+      if (nameEl) {
+        const namePos = this.computeOriginAdjusted(nameEl);
+        formData.append('name_position[x]', String(namePos.x));
+        formData.append('name_position[y]', String(namePos.y));
+        formData.append('name_position[fontSize]', String(nameEl.fontSize || 28));
+        formData.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
+        formData.append('name_position[color]', String(nameEl.color || '#000'));
+        formData.append('name_position[rotation]', String(nameEl.rotation || 0));
+      }
+      if (dateEl) {
+        const datePos = this.computeOriginAdjusted(dateEl);
+        formData.append('date_position[x]', String(datePos.x));
+        formData.append('date_position[y]', String(datePos.y));
+        formData.append('date_position[fontSize]', String(dateEl.fontSize || 16));
+        formData.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
+        formData.append('date_position[color]', String(dateEl.color || '#333'));
+        formData.append('date_position[rotation]', String(dateEl.rotation || 0));
+      }
+      if (qrEl) {
+        const qrPos = this.computeOriginAdjusted(qrEl);
+        formData.append('qr_position[x]', String(qrPos.x));
+        formData.append('qr_position[y]', String(qrPos.y));
+        formData.append('qr_position[width]', String(qrEl.width || 120));
+        formData.append('qr_position[height]', String(qrEl.height || 120));
+        formData.append('qr_position[rotation]', String(qrEl.rotation || 0));
+      }
+    }
 
     const templateId = this.selectedTemplate()!.id;
 
-    this.templateService.updateTemplate(templateId, templateData).subscribe({
+    this.templateService.updateTemplate(templateId, formData).subscribe({
       next: (response) => {
         this.isLoading.set(false);
         if (response.success) {
@@ -386,10 +631,456 @@ export class TemplatesComponent implements OnInit {
       },
       error: (error) => {
         this.isLoading.set(false);
-        this.errorMessage.set('Error al actualizar plantilla');
+        if (error?.status === 422) {
+          const errs = error?.error?.errors || {};
+          const messages = Object.keys(errs).map(k => Array.isArray(errs[k]) ? errs[k].join(' ') : String(errs[k]));
+          this.errorMessage.set(messages.length ? messages[0] : (error?.error?.message || 'Datos inválidos (422)'));
+        } else {
+          this.errorMessage.set(error?.error?.message || 'Error al actualizar plantilla');
+        }
         console.error('Error updating template:', error);
       }
     });
+  }
+
+  // Editor visual
+  openPositionEditor(): void {
+    const useTpl = (t: any) => {
+      const currentUrl = (t?.file_url || t?.file_path || this.uploadedPreviewUrl || null);
+      if (!currentUrl) {
+        this.errorMessage.set('Sube una imagen de fondo de plantilla para editar posiciones.');
+        return;
+      }
+      this.uploadedPreviewUrl = currentUrl;
+      const img = new Image();
+      img.onload = () => {
+        this.backgroundImageSize.set({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.src = currentUrl as string;
+      const offX = Number(t?.template_styles?.background_offset?.x ?? this.backgroundOffset().x ?? 0);
+      const offY = Number(t?.template_styles?.background_offset?.y ?? this.backgroundOffset().y ?? 0);
+      this.backgroundOffset.set({ x: Math.round(offX), y: Math.round(offY) });
+      const els: { type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string }[] = [];
+      const namePos = t?.name_position;
+      if (namePos) {
+        const x = namePos.x != null ? Number(namePos.x) : (namePos.left != null ? Number(namePos.left) : null);
+        const y = namePos.y != null ? Number(namePos.y) : (namePos.top != null ? Number(namePos.top) : null);
+        if (x != null && y != null) {
+          els.push({ type: 'name', x: Math.round(x), y: Math.round(y), fontFamily: String(namePos.fontFamily || 'Arial'), fontSize: Number(namePos.fontSize || 28), rotation: Number(namePos.rotation || 0), color: String(namePos.color || '#000') });
+        }
+      }
+      const datePos = t?.date_position;
+      if (datePos) {
+        const x = datePos.x != null ? Number(datePos.x) : (datePos.left != null ? Number(datePos.left) : null);
+        const y = datePos.y != null ? Number(datePos.y) : (datePos.top != null ? Number(datePos.top) : null);
+        if (x != null && y != null) {
+          els.push({ type: 'date', x: Math.round(x), y: Math.round(y), fontFamily: String(datePos.fontFamily || 'Arial'), fontSize: Number(datePos.fontSize || 16), rotation: Number(datePos.rotation || 0), color: String(datePos.color || '#333') });
+        }
+      }
+      const qrPos = t?.qr_position;
+      if (qrPos) {
+        const x = qrPos.x != null ? Number(qrPos.x) : (qrPos.left != null ? Number(qrPos.left) : null);
+        const y = qrPos.y != null ? Number(qrPos.y) : (qrPos.top != null ? Number(qrPos.top) : null);
+        if (x != null && y != null) {
+          els.push({ type: 'qr', x: Math.round(x), y: Math.round(y), width: Number(qrPos.width || qrPos.size || 120), height: Number(qrPos.height || qrPos.size || 120), rotation: Number(qrPos.rotation || 0) });
+        }
+      }
+      if (els.length) {
+        this.editorElements.set(els);
+        this.selectedElementIndex.set(0);
+      } else {
+        // No agregar elementos por defecto aún; esperar a medir el lienzo
+        this.editorElements.set([]);
+        this.selectedElementIndex.set(null);
+      }
+      this.showEditor.set(true);
+      setTimeout(() => {
+        const bgImgEl = document.querySelector('.editor-background') as HTMLImageElement | null;
+        const adjust = () => {
+          const layerEl = document.querySelector('.editor-layer') as HTMLElement | null;
+          const w = layerEl ? layerEl.clientWidth : (bgImgEl ? bgImgEl.clientWidth : 0);
+          const h = layerEl ? layerEl.clientHeight : (bgImgEl ? bgImgEl.clientHeight : 0);
+          if (w > 0 && h > 0) {
+            this.editorCanvasSize.set({ width: w, height: h });
+            const origin = String(t?.template_styles?.coords_origin || 'center').toLowerCase();
+            if (origin === 'center') {
+              const midX = Math.round(w / 2);
+              const midY = Math.round(h / 2);
+              const els2 = this.editorElements().map(el => {
+                const x = Math.round((el.x || 0) + midX);
+                const y = Math.round((el.y || 0) + midY);
+                return { ...el, x, y };
+              });
+              this.editorElements.set(els2);
+            }
+            if (this.editorElements().length === 0) {
+              this.addNameElement(true);
+            }
+          } else {
+            setTimeout(adjust, 50);
+          }
+        };
+        if (bgImgEl && bgImgEl.complete) {
+          adjust();
+        } else if (bgImgEl) {
+          bgImgEl.addEventListener('load', adjust, { once: true });
+        } else {
+          adjust();
+        }
+      }, 0);
+    };
+
+    if (this.uploadedPreviewUrl && !this.selectedTemplate()) {
+      useTpl({});
+      return;
+    }
+
+    const tpl = this.selectedTemplate();
+    if (!tpl) {
+      useTpl({});
+      return;
+    }
+    const hasPositions = !!((((tpl as any).name_position) || ((tpl as any).date_position) || ((tpl as any).qr_position)) || tpl.file_url);
+    if (hasPositions) {
+      useTpl(tpl);
+      return;
+    }
+    if (tpl.id) {
+      this.templateService.getTemplate(tpl.id).subscribe({
+        next: (res) => {
+          const full = res?.data?.template || tpl;
+          this.selectedTemplate.set(full);
+          useTpl(full);
+        },
+        error: () => {
+          useTpl(tpl);
+        }
+      });
+      return;
+    }
+    useTpl({});
+  }
+
+  closePositionEditor(): void {
+    this.showEditor.set(false);
+    this.isDragging = false;
+  }
+
+  cancelEditor(): void {
+    this.closePositionEditor();
+  }
+
+  saveEditor(): void {
+    const tpl = this.selectedTemplate();
+    if (tpl && tpl.id) {
+      const fd = new FormData();
+      fd.append('_method', 'PUT');
+      const bg = this.backgroundOffset();
+      fd.append('template_styles[background_offset][x]', String(Math.round(bg.x)));
+      fd.append('template_styles[background_offset][y]', String(Math.round(bg.y)));
+      const bgSz = this.backgroundImageSize();
+      if (bgSz) {
+        fd.append('background_image_size[width]', String(bgSz.width));
+        fd.append('background_image_size[height]', String(bgSz.height));
+      }
+      const canSz = this.editorCanvasSize();
+      if (canSz) {
+        fd.append('template_styles[editor_canvas_size][width]', String(Math.round(canSz.width)));
+        fd.append('template_styles[editor_canvas_size][height]', String(Math.round(canSz.height)));
+      }
+      fd.append('template_styles[coords_origin]', 'left-top');
+      const nameEl = this.editorElements().find(el => el.type === 'name');
+      const dateEl = this.editorElements().find(el => el.type === 'date');
+      const qrEl = this.editorElements().find(el => el.type === 'qr');
+      if (nameEl) {
+        const namePos = this.computeOriginAdjusted(nameEl);
+        fd.append('name_position[x]', String(namePos.x));
+        fd.append('name_position[y]', String(namePos.y));
+        fd.append('name_position[left]', String(Math.round(nameEl.x))); // absoluto
+        fd.append('name_position[top]', String(Math.round(nameEl.y)));  // absoluto
+        fd.append('name_position[fontSize]', String(nameEl.fontSize || 28));
+        fd.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
+        fd.append('name_position[color]', String(nameEl.color || '#000'));
+        fd.append('name_position[rotation]', String(nameEl.rotation || 0));
+        fd.append('name_position[textAlign]', 'left');
+      }
+      if (dateEl) {
+        const datePos = this.computeOriginAdjusted(dateEl);
+        fd.append('date_position[x]', String(datePos.x));
+        fd.append('date_position[y]', String(datePos.y));
+        fd.append('date_position[left]', String(Math.round(dateEl.x))); // absoluto
+        fd.append('date_position[top]', String(Math.round(dateEl.y)));  // absoluto
+        fd.append('date_position[fontSize]', String(dateEl.fontSize || 16));
+        fd.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
+        fd.append('date_position[color]', String(dateEl.color || '#333'));
+        fd.append('date_position[rotation]', String(dateEl.rotation || 0));
+        fd.append('date_position[textAlign]', 'left');
+      }
+      if (qrEl) {
+        const qrPos = this.computeOriginAdjusted(qrEl);
+        fd.append('qr_position[x]', String(qrPos.x));
+        fd.append('qr_position[y]', String(qrPos.y));
+        fd.append('qr_position[left]', String(Math.round(qrEl.x))); // absoluto
+        fd.append('qr_position[top]', String(Math.round(qrEl.y)));  // absoluto
+        fd.append('qr_position[width]', String(qrEl.width || 120));
+        fd.append('qr_position[height]', String(qrEl.height || 120));
+        fd.append('qr_position[size]', String(qrEl.width || 120)); // compatibilidad
+        fd.append('qr_position[rotation]', String(qrEl.rotation || 0));
+      }
+      this.isLoading.set(true);
+      this.templateService.updateTemplate(tpl.id, fd).subscribe({
+        next: (res) => {
+          this.isLoading.set(false);
+          if (res.success) {
+            this.successMessage.set('Posiciones actualizadas');
+            this.loadTemplates();
+          } else {
+            this.errorMessage.set(res.message || 'Error al actualizar posiciones');
+          }
+          this.closePositionEditor();
+        },
+        error: (err) => {
+          this.isLoading.set(false);
+          this.errorMessage.set(err?.error?.message || 'Error al actualizar posiciones');
+          this.closePositionEditor();
+        }
+      });
+    } else {
+      this.successMessage.set('Editor listo: posiciones guardadas para enviar.');
+      this.closePositionEditor();
+    }
+  }
+
+  updateBackgroundOffsetX(event: Event): void {
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    const cur = this.backgroundOffset();
+    this.backgroundOffset.set({ x: isNaN(value) ? cur.x : Math.round(value), y: cur.y });
+  }
+
+  updateBackgroundOffsetY(event: Event): void {
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    const cur = this.backgroundOffset();
+    this.backgroundOffset.set({ x: cur.x, y: isNaN(value) ? cur.y : Math.round(value) });
+  }
+
+  nudgeBackground(dx: number, dy: number): void {
+    const cur = this.backgroundOffset();
+    this.backgroundOffset.set({ x: cur.x + dx, y: cur.y + dy });
+  }
+
+  addNameElement(center = false): void {
+    const existingIndex = this.editorElements().findIndex(e => e.type === 'name');
+    if (existingIndex !== -1) {
+      const els = [...this.editorElements()];
+      els.splice(existingIndex, 1);
+      this.editorElements.set(els);
+      this.selectedElementIndex.set(null);
+      return;
+    }
+    const canvasRect = this.getCanvasRect();
+    const x = center ? Math.round(canvasRect.width / 2) : 40; // top-left anclado en centro => coords relativas 0,0
+    const y = center ? Math.round(canvasRect.height / 2) : 40;
+    const el = { type: 'name' as const, x, y, fontFamily: 'Arial', fontSize: 28, rotation: 0, color: '#000' };
+    this.editorElements.set([...this.editorElements(), el]);
+    this.selectedElementIndex.set(this.editorElements().length - 1);
+  }
+
+  addDateElement(): void {
+    const existingIndex = this.editorElements().findIndex(e => e.type === 'date');
+    if (existingIndex !== -1) {
+      const els = [...this.editorElements()];
+      els.splice(existingIndex, 1);
+      this.editorElements.set(els);
+      this.selectedElementIndex.set(null);
+      return;
+    }
+    const canvasRect = this.getCanvasRect();
+    const el = { type: 'date' as const, x: Math.round(canvasRect.width / 2), y: Math.round(canvasRect.height / 2), fontFamily: 'Arial', fontSize: 16, rotation: 0, color: '#333' };
+    this.editorElements.set([...this.editorElements(), el]);
+    this.selectedElementIndex.set(this.editorElements().length - 1);
+  }
+
+  addQrElement(): void {
+    const existingIndex = this.editorElements().findIndex(e => e.type === 'qr');
+    if (existingIndex !== -1) {
+      const els = [...this.editorElements()];
+      els.splice(existingIndex, 1);
+      this.editorElements.set(els);
+      this.selectedElementIndex.set(null);
+      return;
+    }
+    const el = { type: 'qr' as const, x: 80, y: 120, width: 120, height: 120 };
+    this.editorElements.set([...this.editorElements(), el]);
+    this.selectedElementIndex.set(this.editorElements().length - 1);
+  }
+
+  selectElement(index: number): void {
+    this.selectedElementIndex.set(index);
+  }
+
+  getSelected() {
+    const idx = this.selectedElementIndex();
+    if (idx === null) return null;
+    return this.editorElements()[idx] || null;
+  }
+
+  updateFontFamily(event: Event): void {
+    const el = this.getSelected();
+    if (!el) return;
+    const value = (event.target as HTMLSelectElement).value;
+    el.fontFamily = value;
+    this.editorElements.set([...this.editorElements()]);
+  }
+
+  updateFontSize(event: Event): void {
+    const el = this.getSelected();
+    if (!el) return;
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    el.fontSize = isNaN(value) ? el.fontSize : value;
+    this.editorElements.set([...this.editorElements()]);
+    this.clampSelectedWithinCanvas();
+  }
+
+  // Ajusta tamaño del QR (ancho y alto iguales)
+  updateQrSize(event: Event): void {
+    const el = this.getSelected();
+    if (!el || el.type !== 'qr') return;
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    const size = isNaN(value) ? (el.width || 120) : Math.max(20, Math.min(value, 1000));
+    el.width = size;
+    el.height = size;
+    this.editorElements.set([...this.editorElements()]);
+    this.clampSelectedWithinCanvas();
+  }
+
+  updateRotation(event: Event): void {
+    const el = this.getSelected();
+    if (!el) return;
+    const value = parseInt((event.target as HTMLInputElement).value, 10);
+    el.rotation = isNaN(value) ? (el.rotation || 0) : value;
+    this.editorElements.set([...this.editorElements()]);
+    this.clampSelectedWithinCanvas();
+  }
+
+  startDrag(event: MouseEvent, index: number): void {
+    this.selectElement(index);
+    this.isDragging = true;
+    const target = event.target as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    this.dragOffset = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    window.addEventListener('mousemove', this.onDragBound);
+    window.addEventListener('mouseup', this.endDragBound);
+  }
+
+  private onDragBound = (event: MouseEvent) => this.onDrag(event);
+  private endDragBound = () => this.endDrag();
+
+  onDrag(event: MouseEvent): void {
+    if (!this.isDragging || this.selectedElementIndex() === null) return;
+    const idx = this.selectedElementIndex()!;
+    const canvasRect = this.getCanvasRect();
+    const x = event.clientX - canvasRect.left - this.dragOffset.x;
+    const y = event.clientY - canvasRect.top - this.dragOffset.y;
+    const domEls = Array.from(document.querySelectorAll('.editor-element')) as HTMLElement[];
+    const domEl = domEls[idx] || null;
+    const elW = domEl ? domEl.offsetWidth : (this.editorElements()[idx].type === 'qr' ? (this.editorElements()[idx].width || 0) : 1);
+    const elH = domEl ? domEl.offsetHeight : (this.editorElements()[idx].type === 'qr' ? (this.editorElements()[idx].height || 0) : 1);
+    const els = [...this.editorElements()];
+    const maxX = canvasRect.width - elW;
+    const maxY = canvasRect.height - elH;
+    els[idx] = { ...els[idx], x: Math.max(0, Math.min(x, maxX)), y: Math.max(0, Math.min(y, maxY)) };
+    this.editorElements.set(els);
+  }
+
+  endDrag(): void {
+    this.isDragging = false;
+    window.removeEventListener('mousemove', this.onDragBound);
+    window.removeEventListener('mouseup', this.endDragBound);
+  }
+
+  private getCanvasRect(): { left: number; top: number; width: number; height: number } {
+    const layer = document.querySelector('.editor-layer') as HTMLElement | null;
+    if (!layer) return { left: 0, top: 0, width: 800, height: 600 };
+    const rect = layer.getBoundingClientRect();
+    return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+  }
+
+  private clampSelectedWithinCanvas(): void {
+    const idx = this.selectedElementIndex();
+    if (idx === null) return;
+    const canvasRect = this.getCanvasRect();
+    const domEls = Array.from(document.querySelectorAll('.editor-element')) as HTMLElement[];
+    const domEl = domEls[idx] || null;
+    const elW = domEl ? domEl.offsetWidth : (this.editorElements()[idx].type === 'qr' ? (this.editorElements()[idx].width || 0) : 1);
+    const elH = domEl ? domEl.offsetHeight : (this.editorElements()[idx].type === 'qr' ? (this.editorElements()[idx].height || 0) : 1);
+    const maxX = Math.max(0, canvasRect.width - elW);
+    const maxY = Math.max(0, canvasRect.height - elH);
+    const els = [...this.editorElements()];
+    const cur = els[idx];
+    els[idx] = { ...cur, x: Math.max(0, Math.min(cur.x || 0, maxX)), y: Math.max(0, Math.min(cur.y || 0, maxY)) };
+    this.editorElements.set(els);
+  }
+
+  private computeOriginAdjusted(el: { x: number; y: number; type?: 'name' | 'date' | 'qr'; width?: number; height?: number }): { x: number; y: number } {
+    const canSz = this.editorCanvasSize();
+    if (canSz) {
+      const midX = Math.round(canSz.width / 2);
+      const midY = Math.round(canSz.height / 2);
+      const rx = Math.round((el.x || 0) - midX);
+      const ry = Math.round((el.y || 0) - midY);
+      return { x: rx, y: ry };
+    }
+    return { x: Math.round(el.x || 0), y: Math.round(el.y || 0) };
+  }
+
+  deleteSelectedElement(): void {
+    const idx = this.selectedElementIndex();
+    if (idx === null) return;
+    const els = [...this.editorElements()];
+    els.splice(idx, 1);
+    this.editorElements.set(els);
+    this.selectedElementIndex.set(null);
+  }
+
+  hasElement(type: 'name' | 'date' | 'qr'): boolean {
+    return this.editorElements().some(e => e.type === type);
+  }
+
+  isSelectedType(type: 'name' | 'date' | 'qr'): boolean {
+    const idx = this.selectedElementIndex();
+    return idx !== null && this.editorElements()[idx]?.type === type;
+  }
+
+  // Coordenadas relativas al centro del lienzo (mostrar solo)
+  getSelectedRelativeX(): number {
+    const el = this.getSelected();
+    if (!el) return 0;
+    const canvasRect = this.getCanvasRect();
+    return Math.round((el.x || 0) - (canvasRect.width / 2));
+  }
+
+  getSelectedRelativeY(): number {
+    const el = this.getSelected();
+    if (!el) return 0;
+    const canvasRect = this.getCanvasRect();
+    return Math.round((el.y || 0) - (canvasRect.height / 2));
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      if (this.showEditor()) {
+        this.cancelEditor();
+        return;
+      }
+      if (this.showCreateModal() || this.showEditModal() || this.showDeleteModal() || this.showViewModal()) {
+        this.closeModals();
+        return;
+      }
+    }
+    if (this.showEditor() && event.key === 'Delete') {
+      this.deleteSelectedElement();
+    }
   }
 
   deleteTemplate(): void {
@@ -413,7 +1104,11 @@ export class TemplatesComponent implements OnInit {
       },
       error: (error) => {
         this.isLoading.set(false);
-        this.errorMessage.set('Error al eliminar plantilla');
+        if (error?.status === 409) {
+          this.errorMessage.set(error?.error?.message || 'No se puede eliminar una plantilla que tiene certificados asociados');
+        } else {
+          this.errorMessage.set(error?.error?.message || 'Error al eliminar plantilla');
+        }
         console.error('Error deleting template:', error);
       }
     });

@@ -26,22 +26,48 @@ class QRCodeService
         $filename = 'qr_' . Str::random(10) . '.png';
         $path = 'qrcodes/' . $filename;
 
-        // Generar el código QR
-        $qrCode = QrCode::format('png')
-            ->size(300)
-            ->errorCorrection('H')
-            ->generate($url);
+        try {
+            $qrCode = QrCode::format('png')
+                ->size(300)
+                ->margin(2)
+                ->errorCorrection('M')
+                ->generate($url);
 
-        // Guardar el código QR
-        Storage::disk('public')->put($path, $qrCode);
+            Storage::disk('public')->put($path, $qrCode);
+            return $path;
+        } catch (\Exception $e) {
+            Log::warning('Fallo al generar QR (URL) con simple-qrcode, aplicando fallback GD', [
+                'error' => $e->getMessage()
+            ]);
 
-        return $path;
+            try {
+                $im = \imagecreatetruecolor(300, 300);
+                $white = \imagecolorallocate($im, 255, 255, 255);
+                $black = \imagecolorallocate($im, 0, 0, 0);
+                \imagefill($im, 0, 0, $white);
+                \imagerectangle($im, 0, 0, 299, 299, $black);
+                \imagestring($im, 3, 60, 140, 'QR no disponible', $black);
+                ob_start();
+                \imagepng($im);
+                $pngData = ob_get_clean();
+                \imagedestroy($im);
+                Storage::disk('public')->put($path, $pngData);
+                return $path;
+            } catch (\Exception $gdEx) {
+                Log::error('Fallback GD para QR (URL) falló', [
+                    'error' => $gdEx->getMessage()
+                ]);
+                return '';
+            }
+        }
     }
     /**
      * Generar código QR para un certificado
      */
-    public function generateQRCode(Certificate $certificate): string
+    public function generateQRCode(Certificate $certificate, ?string $verificationUrl = null): string
     {
+        // Generación activa de QR (sin deshabilitación temporal por env)
+
         // Generar códigos de verificación si no existen
         if (!$certificate->verification_code) {
             $certificate->verification_code = $this->generateVerificationCode($certificate);
@@ -51,12 +77,13 @@ class QRCodeService
             $certificate->verification_token = $this->generateVerificationToken();
         }
 
-        // Generar URL de verificación
-        $verificationUrl = $this->generateVerificationUrl($certificate->verification_code);
-        $certificate->verification_url = $verificationUrl;
+        // URL de verificación (usar la provista si existe)
+        $certificate->verification_url = $verificationUrl
+            ? $verificationUrl
+            : $this->generateVerificationUrl($certificate->verification_code);
 
         // Generar imagen QR
-        $qrImagePath = $this->createQRImage($verificationUrl, $certificate);
+        $qrImagePath = $this->createQRImage($certificate->verification_url, $certificate);
         $certificate->qr_image_path = $qrImagePath;
 
         // Generar imagen final del certificado con QR y nombre
@@ -74,25 +101,70 @@ class QRCodeService
      */
     private function createQRImage(string $url, Certificate $certificate): string
     {
-        try {
-            // Generar nombre único para el archivo
-            $filename = 'qr_' . $certificate->id . '_' . Str::random(8) . '.svg';
-            $path = 'certificates/qr/' . $filename;
+        // Generar nombre único para el archivo en PNG
+        $filename = 'qr_' . $certificate->id . '_' . Str::random(8) . '.png';
+        $path = 'certificates/qr/' . $filename;
 
-            // Generar QR usando SVG (no requiere extensiones adicionales)
-            $qrCode = QrCode::format('svg')
+        try {
+            // Intentar con simple-qrcode (requiere Imagick para PNG en esta versión)
+            $qrCode = QrCode::format('png')
                 ->size(300)
                 ->margin(2)
                 ->errorCorrection('M')
                 ->generate($url);
 
-            // Guardar en storage
             Storage::disk('public')->put($path, $qrCode);
-
+            Log::info('QR generado con simple-qrcode', [
+                'certificate_id' => $certificate->id,
+                'path' => $path,
+                'url' => $url
+            ]);
             return $path;
         } catch (\Exception $e) {
-            Log::error('Error creando imagen QR: ' . $e->getMessage());
-            throw $e;
+            // Fallback: generar un PNG simple con GD si Imagick no está disponible
+            Log::warning('Fallo al generar QR con simple-qrcode, aplicando fallback GD', [
+                'error' => $e->getMessage()
+            ]);
+
+            try {
+                if (class_exists('TCPDF2DBarcode')) {
+                    $barcode = new \TCPDF2DBarcode($url, 'QRCODE,H');
+                    $pngData = $barcode->getBarcodePngData(6);
+                    Storage::disk('public')->put($path, $pngData);
+                    Log::info('QR generado con TCPDF2DBarcode (fallback)', [
+                        'certificate_id' => $certificate->id,
+                        'path' => $path,
+                        'url' => $url
+                    ]);
+                    return $path;
+                }
+
+                // Último fallback: generar un PNG legible indicando error
+                $im = \imagecreatetruecolor(300, 300);
+                \imagesavealpha($im, true);
+                $transparent = \imagecolorallocatealpha($im, 255, 255, 255, 0);
+                \imagefill($im, 0, 0, $transparent);
+                $black = \imagecolorallocate($im, 0, 0, 0);
+                \imagerectangle($im, 0, 0, 299, 299, $black);
+                \imagestring($im, 3, 60, 140, 'QR no disponible', $black);
+                ob_start();
+                \imagepng($im);
+                $pngData = ob_get_clean();
+                \imagedestroy($im);
+                Storage::disk('public')->put($path, $pngData);
+                Log::warning('Fallback QR simple generado', [
+                    'certificate_id' => $certificate->id,
+                    'path' => $path,
+                    'url' => $url
+                ]);
+                return $path;
+            } catch (\Exception $gdEx) {
+                Log::error('Fallback GD para QR falló', [
+                    'error' => $gdEx->getMessage()
+                ]);
+                // En último caso, no bloquear creación: devolver ruta vacía
+                return '';
+            }
         }
     }
 
@@ -179,7 +251,7 @@ class QRCodeService
     /**
      * Generar imagen final del certificado con QR
      */
-    private function generateFinalCertificateImage(Certificate $certificate): string
+    private function generateFinalCertificateImage(Certificate $certificate): ?string
     {
         try {
             return $this->imageService->generateFinalCertificateImage($certificate, $certificate->qr_image_path);

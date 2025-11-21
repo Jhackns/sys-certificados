@@ -44,7 +44,6 @@ Route::prefix('public')->group(function () {
     Route::get('/certificate/{code}', [CertificateController::class, 'byCode']);
 });
 
-// === CONSULTAS PÚBLICAS ===
 /*
 |--------------------------------------------------------------------------
 | RUTAS PROTEGIDAS CON AUTENTICACIÓN
@@ -134,6 +133,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('certificate-templates')->group(function () {
         Route::get('/', [CertificateTemplateController::class, 'index'])->middleware('permission:templates.read');
         Route::get('/list', [CertificateTemplateController::class, 'list'])->middleware('permission:templates.read'); // Para dropdowns
+        Route::get('/fonts', [CertificateTemplateController::class, 'fonts'])->middleware('permission:templates.read'); // Lista de fuentes
         Route::get('/{id}', [CertificateTemplateController::class, 'show'])->middleware('permission:templates.read');
         Route::get('/{id}/preview', [CertificateTemplateController::class, 'preview'])->middleware('permission:templates.read'); // Para vista previa
         Route::post('/', [CertificateTemplateController::class, 'store']); // Temporalmente sin middleware
@@ -146,13 +146,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{id}/clone', [CertificateTemplateController::class, 'clone'])->middleware('permission:templates.create');
         Route::put('/{id}/positions', [CertificateTemplateController::class, 'updatePositions'])->middleware('permission:templates.update');
 
-        // Validación de diseños de Canva
-        Route::post('/validate-canva-design', [CertificateTemplateController::class, 'validateCanvaDesign']);
-    });
-
-    // Ruta adicional para compatibilidad con frontend
-    Route::prefix('canva')->group(function () {
-        Route::post('/validate-design', [CertificateTemplateController::class, 'validateCanvaDesign']);
     });
 
     // === GESTIÓN DE CERTIFICADOS ===
@@ -160,6 +153,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [CertificateController::class, 'index']);
         Route::get('/my-certificates', [CertificateController::class, 'myCertificates']);
         Route::get('/{id}', [CertificateController::class, 'show']);
+        // Pre-check antes de crear certificado
+        Route::post('/precheck', [CertificateController::class, 'precheck'])
+            ->withoutMiddleware('permission:certificates.read')
+            ->middleware('permission:certificates.create');
         Route::post('/', [CertificateController::class, 'store'])->middleware('permission:certificates.create');
         Route::put('/{id}', [CertificateController::class, 'update'])->middleware('permission:certificates.update');
         Route::delete('/{id}', [CertificateController::class, 'destroy'])->middleware('permission:certificates.delete');

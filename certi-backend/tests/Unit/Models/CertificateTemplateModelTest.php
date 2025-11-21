@@ -18,9 +18,13 @@ class CertificateTemplateModelTest extends TestCase
             'name',
             'description',
             'file_path',
+            'name_position',
+            'date_position',
+            'qr_position',
+            'background_image_size',
+            'template_styles',
             'activity_type',
             'status',
-            'canva_design_id',
         ];
         
         $this->assertEquals($expectedFillable, $fillable);

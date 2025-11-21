@@ -1,36 +1,22 @@
 <?php
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Default QR Code Backend
-    |--------------------------------------------------------------------------
-    |
-    | This option controls the default backend used for generating QR codes.
-    | You may set this to any of the backends supported by the package.
-    |
-    | Supported: "gd", "imagick"
-    |
-    */
+    // Formato de salida por defecto del QR (png, svg, eps)
+    'writer' => 'png',
 
-    'default' => 'gd',
+    // Forzar backend de imagen a GD para evitar dependencia de Imagick
+    // Valores soportados: 'gd', 'imagick'
+    'image_backend' => 'gd',
 
-    /*
-    |--------------------------------------------------------------------------
-    | QR Code Backends
-    |--------------------------------------------------------------------------
-    |
-    | Here you may configure the backends used for generating QR codes.
-    | Each backend may have its own configuration options.
-    |
-    */
+    // Tamaño por defecto en píxeles
+    'size' => 300,
 
-    'backends' => [
-        'gd' => [
-            'driver' => 'gd',
-        ],
-        'imagick' => [
-            'driver' => 'imagick',
-        ],
-    ],
+    // Margen alrededor del QR
+    'margin' => 2,
+
+    // Codificación
+    'encoding' => 'UTF-8',
+
+    // Nivel de corrección de errores (L, M, Q, H)
+    'error_correction' => 'M',
 ];
