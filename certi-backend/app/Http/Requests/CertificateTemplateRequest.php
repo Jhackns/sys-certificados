@@ -28,7 +28,8 @@ class CertificateTemplateRequest extends FormRequest
             'status' => 'required|in:active,inactive',
             'template_file' => 'sometimes|file|mimes:jpg,jpeg,png,pdf|max:5120', // Permitir imágenes y aumentar tamaño
             // Posiciones para texto y QR
-            'name_position' => 'sometimes|array',
+            // Posiciones para texto y QR
+            'name_position' => 'required|array',
             'name_position.x' => 'required_with:name_position|numeric',
             'name_position.y' => 'required_with:name_position|numeric',
             'name_position.left' => 'sometimes|numeric',
@@ -41,7 +42,7 @@ class CertificateTemplateRequest extends FormRequest
             'name_position.fontWeight' => 'sometimes|string|max:20',
             'name_position.fontStyle' => 'sometimes|string|max:20',
 
-            'qr_position' => 'sometimes|array',
+            'qr_position' => 'nullable|array',
             'qr_position.x' => 'required_with:qr_position|numeric',
             'qr_position.y' => 'required_with:qr_position|numeric',
             'qr_position.left' => 'sometimes|numeric',
@@ -50,7 +51,7 @@ class CertificateTemplateRequest extends FormRequest
             'qr_position.height' => 'sometimes|numeric|min:10|max:2000',
             'qr_position.rotation' => 'sometimes|numeric|min:-360|max:360',
             // Posición de fecha (opcional)
-            'date_position' => 'sometimes|array',
+            'date_position' => 'nullable|array',
             'date_position.x' => 'required_with:date_position|numeric',
             'date_position.y' => 'required_with:date_position|numeric',
             'date_position.left' => 'sometimes|numeric',

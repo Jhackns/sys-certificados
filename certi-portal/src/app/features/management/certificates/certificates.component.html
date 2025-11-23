@@ -62,11 +62,32 @@
     </form>
   </div>
 
+  <!-- Bulk Actions Toolbar -->
+  <div class="bulk-actions-toolbar" *ngIf="selectedCertificateIds().size > 1">
+    <div class="bulk-info">
+      <span class="selected-count">{{ selectedCertificateIds().size }}</span>
+      <span>certificados seleccionados</span>
+    </div>
+    <div class="bulk-buttons">
+      <button class="btn btn-send-bulk" (click)="bulkSendEmails()">
+        <i class="fas fa-envelope"></i>
+        Enviar Emails a Seleccionados
+      </button>
+      <button class="btn btn-delete-bulk" (click)="openBulkDeleteConfirm()">
+        <i class="fas fa-trash"></i>
+        Eliminar Seleccionados
+      </button>
+    </div>
+  </div>
+
   <!-- Contenedor de tabla -->
   <div class="table-container">
     <table class="certificates-table">
       <thead>
         <tr>
+          <th class="checkbox-col">
+            <input type="checkbox" [checked]="isAllCertificatesSelected()" (change)="toggleAllCertificates()">
+          </th>
           <th>Código</th>
           <th>Nombre</th>
           <th>Usuario</th>
@@ -97,7 +118,12 @@
         </tr>
 
         <!-- Filas de certificados -->
-        <tr *ngFor="let certificate of certificates()" class="certificate-row">
+        <tr *ngFor="let certificate of certificates()" class="certificate-row"
+          [class.selected]="isCertificateSelected(certificate.id)">
+          <td class="checkbox-col">
+            <input type="checkbox" [checked]="isCertificateSelected(certificate.id)"
+              (change)="toggleCertificate(certificate.id)">
+          </td>
           <td>
             <span class="certificate-code">{{ certificate.unique_code }}</span>
           </td>
@@ -194,15 +220,48 @@
             </div>
 
             <div class="form-group">
-              <label>Usuario <span class="required">*</span></label>
-              <select class="form-control" formControlName="user_id"
-                [class.invalid]="createForm.get('user_id')?.invalid && createForm.get('user_id')?.touched">
-                <option value="">Seleccione usuario</option>
-                <option *ngFor="let user of users()" [value]="user.id">{{ user.name }} ({{ user.email }})</option>
-              </select>
-              <div class="error-message"
-                *ngIf="createForm.get('user_id')?.invalid && createForm.get('user_id')?.touched">
-                <span *ngIf="createForm.get('user_id')?.errors?.['required']">El usuario es requerido</span>
+              <label>Usuarios <span class="required">*</span></label>
+              <div class="user-selection-container">
+                <!-- Search and Select All -->
+                <div class="user-selection-header">
+                  <div class="search-input-wrapper">
+                    <i class="fas fa-search"></i>
+                    <input type="text" [value]="searchTerm()" (input)="searchTerm.set($any($event.target).value)"
+                      placeholder="Buscar usuario..." class="form-control form-control-sm">
+                  </div>
+                  <div class="select-all-wrapper">
+                    <label class="checkbox-label">
+                      <input type="checkbox" [checked]="isAllSelected()" (change)="toggleAllUsers()">
+                      Seleccionar todos
+                    </label>
+                  </div>
+                </div>
+
+                <!-- User List -->
+                <div class="user-list">
+                  <div *ngFor="let user of filteredUsers()" class="user-item">
+                    <label class="checkbox-label">
+                      <input type="checkbox" [checked]="isSelected(user.id)" (change)="toggleUser(user.id)">
+                      <span class="user-name">{{ user.name }}</span>
+                      <small class="user-email">{{ user.email }}</small>
+                    </label>
+                  </div>
+                  <div *ngIf="filteredUsers().length === 0" class="no-users">
+                    No se encontraron usuarios
+                  </div>
+                </div>
+
+                <!-- Selection Summary -->
+                <div class="selection-summary" *ngIf="selectedUserIds().size > 0">
+                  <small>{{ selectedUserIds().size }} usuario(s) seleccionado(s)</small>
+                </div>
+              </div>
+
+              <!-- Hidden input for validation if needed, or just rely on manual check in TS -->
+              <input type="hidden" formControlName="user_id" [value]="selectedUserIds().size > 0 ? 'batch' : ''">
+
+              <div class="error-message" *ngIf="selectedUserIds().size === 0 && createForm.get('user_id')?.touched">
+                <span>Seleccione al menos un usuario</span>
               </div>
             </div>
 
@@ -635,4 +694,83 @@
 
 <!-- Overlay para modales -->
 <div class="modal-backdrop fade show"
-  *ngIf="showViewModal() || showCreateModal() || showEditModal() || showDeleteModal() || showDownloadModal()"></div>
+  *ngIf="showViewModal() || showCreateModal() || showEditModal() || showDeleteModal() || showDownloadModal() || showBulkDeleteConfirmModal()">
+</div>
+
+<!-- Bulk Delete Confirmation Modal -->
+<div class="modal-overlay" *ngIf="showBulkDeleteConfirmModal()">
+  <div class="modal-dialog modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>
+        <i class="fas fa-exclamation-triangle text-danger"></i>
+        Confirmar Eliminación Masiva
+      </h3>
+      <button class="btn-close" (click)="closeBulkDeleteConfirm()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>¡Atención!</strong> Esta acción no se puede deshacer.
+      </div>
+      <p>¿Estás seguro de que deseas eliminar permanentemente <strong>{{ selectedCertificateIds().size }}</strong>
+        certificados seleccionados?</p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" (click)="closeBulkDeleteConfirm()">
+        <i class="fas fa-times"></i>
+        Cancelar
+      </button>
+      <button type="button" class="btn btn-danger" (click)="bulkDeleteCertificates()">
+        <i class="fas fa-trash"></i>
+        Eliminar Seleccionados
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Process Progress Overlay (Shared for Email and Delete) -->
+<div class="batch-progress-overlay" *ngIf="isBulkProcessing()">
+  <div class="batch-progress-content">
+    <div class="spinner-border text-primary" role="status">
+      <span class="sr-only">Procesando...</span>
+    </div>
+    <h3>{{ bulkProcessState().action === 'email' ? 'Enviando Emails' : 'Eliminando Certificados' }}</h3>
+    <p>Por favor espere, estamos procesando su solicitud.</p>
+
+    <div class="progress-stats">
+      <span class="current">{{ bulkProcessState().current }}</span> / <span class="total">{{ bulkProcessState().total
+        }}</span>
+    </div>
+
+    <div class="progress-bar-container">
+      <div class="progress-bar" [style.width.%]="(bulkProcessState().current / bulkProcessState().total) * 100"></div>
+    </div>
+
+    <p class="remaining-text">Restantes: {{ bulkProcessState().total - bulkProcessState().current }}</p>
+
+    <div class="process-details" *ngIf="bulkProcessState().errorCount > 0">
+      <small class="text-danger">Errores: {{ bulkProcessState().errorCount }}</small>
+    </div>
+  </div>
+</div>
+
+<!-- Batch Creation Progress Overlay -->
+<div class="batch-progress-overlay" *ngIf="isCreatingBatch()">
+  <div class="batch-progress-content">
+    <div class="spinner-border text-primary" role="status">
+      <span class="sr-only">Creando...</span>
+    </div>
+    <h3>Creando Certificados</h3>
+    <p>Por favor espere, estamos generando los certificados.</p>
+    <div class="progress-stats">
+      <span class="current">{{ batchProgress().current }}</span> / <span class="total">{{ batchProgress().total
+        }}</span>
+    </div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" [style.width.%]="(batchProgress().current / batchProgress().total) * 100"></div>
+    </div>
+    <p class="remaining-text">Restantes: {{ batchProgress().total - batchProgress().current }}</p>
+  </div>
+</div>

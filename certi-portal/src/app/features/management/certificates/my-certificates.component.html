@@ -1,0 +1,174 @@
+<div class="page">
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-text">
+                <h1>Mis Certificados</h1>
+                <p>Certificados asociados a tu cuenta</p>
+            </div>
+            <div class="header-stats">
+                <div class="stat-card">
+                    <span class="stat-number">{{ certificates().length }}</span>
+                    <span class="stat-label">Total</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div *ngIf="isLoading()" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Cargando certificados...</p>
+    </div>
+
+    <div *ngIf="errorMessage()" class="error-state">
+        <i class="icon-alert"></i>
+        <p>{{ errorMessage() }}</p>
+    </div>
+
+    <div *ngIf="!isLoading() && !errorMessage() && certificates().length === 0" class="empty-state">
+        <div class="empty-icon">📜</div>
+        <h3>No tienes certificados</h3>
+        <p>Aún no se te han emitido certificados</p>
+    </div>
+
+    <div *ngIf="!isLoading() && !errorMessage() && certificates().length > 0" class="certificates-grid">
+        <div *ngFor="let certificate of certificates()" class="certificate-card">
+            <div class="certificate-header">
+                <div class="certificate-code">
+                    <span class="code-label">Código</span>
+                    <span class="code-value">{{ certificate.unique_code }}</span>
+                </div>
+                <div class="certificate-status" [class]="'status-' + certificate.status">
+                    {{ getStatusLabel(certificate.status) }}
+                </div>
+            </div>
+
+            <div class="certificate-content">
+                <h3 class="certificate-title">{{ certificate.nombre || 'Certificado' }}</h3>
+
+                <div class="certificate-details">
+                    <div class="detail-item">
+                        <i class="icon-activity"></i>
+                        <span class="detail-label">Actividad:</span>
+                        <span class="detail-value">{{ certificate.activity?.name || 'No especificada' }}</span>
+                    </div>
+
+                    <div class="detail-item">
+                        <i class="icon-template"></i>
+                        <span class="detail-label">Plantilla:</span>
+                        <span class="detail-value">{{ certificate.template?.name || 'No especificada' }}</span>
+                    </div>
+
+                    <div class="detail-item">
+                        <i class="icon-calendar"></i>
+                        <span class="detail-label">Fecha de emisión:</span>
+                        <span class="detail-value">{{ certificate.fecha_emision ? (certificate.fecha_emision |
+                            date:'dd/MM/yyyy') : 'No especificada' }}</span>
+                    </div>
+
+                    <div *ngIf="certificate.fecha_vencimiento" class="detail-item">
+                        <i class="icon-clock"></i>
+                        <span class="detail-label">Fecha de vencimiento:</span>
+                        <span class="detail-value">{{ certificate.fecha_vencimiento | date:'dd/MM/yyyy' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="certificate-actions">
+                <button class="btn-view" (click)="viewCertificate(certificate)" title="Ver detalles del certificado">
+                    <i class="icon-eye"></i>
+                    Ver Certificado
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de vista detallada -->
+    <div *ngIf="showDetailModal()" class="modal-overlay" (click)="closeDetailModal()">
+        <div class="modal-detail" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Detalles del Certificado</h2>
+                <button class="btn-close" (click)="closeDetailModal()">
+                    <i class="icon-x"></i>
+                </button>
+            </div>
+
+            <div class="modal-body" *ngIf="selectedCertificate()">
+                <div class="certificate-preview">
+                    <div *ngIf="certificatePreview()" class="preview-container">
+                        <img [src]="certificatePreview()" alt="Vista previa del certificado" class="preview-image">
+                    </div>
+                    <div *ngIf="!certificatePreview() && !loadingPreview()" class="preview-placeholder">
+                        <i class="icon-image"></i>
+                        <p>Vista previa no disponible</p>
+                    </div>
+                    <div *ngIf="loadingPreview()" class="preview-loading">
+                        <div class="loading-spinner"></div>
+                        <p>Cargando vista previa...</p>
+                    </div>
+
+                    <!-- Botones de descarga -->
+                    <div class="download-options">
+                        <button type="button" class="btn btn-download-pdf" (click)="downloadCertificateFormat('pdf')"
+                            [disabled]="downloadingPdf()">
+                            <i class="fas fa-file-pdf"></i>
+                            <span>Descargar PDF</span>
+                            <small>Formato estándar para impresión</small>
+                        </button>
+
+                        <button type="button" class="btn btn-download-jpg" (click)="downloadCertificateFormat('jpg')"
+                            [disabled]="downloadingImage()">
+                            <i class="fas fa-file-image"></i>
+                            <span>Descargar JPG</span>
+                            <small>Formato de imagen para compartir</small>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="certificate-info">
+                    <div class="info-section">
+                        <h3>Información General</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Código único:</label>
+                                <span>{{ selectedCertificate()?.unique_code }}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Nombre:</label>
+                                <span>{{ selectedCertificate()?.nombre || 'No especificado' }}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Estado:</label>
+                                <span class="status-badge" [class]="'status-' + selectedCertificate()?.status">
+                                    {{ getStatusLabel(selectedCertificate()?.status || '') }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <h3>Detalles de Emisión</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Actividad:</label>
+                                <span>{{ selectedCertificate()?.activity?.name || 'No especificada' }}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Plantilla:</label>
+                                <span>{{ selectedCertificate()?.template?.name || 'No especificada' }}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Fecha de emisión:</label>
+                                <span>{{ selectedCertificate()?.fecha_emision ? (selectedCertificate()?.fecha_emision |
+                                    date:'dd/MM/yyyy HH:mm') : 'No especificada' }}</span>
+                            </div>
+                            <div *ngIf="selectedCertificate()?.fecha_vencimiento" class="info-item">
+                                <label>Fecha de vencimiento:</label>
+                                <span>{{ selectedCertificate()?.fecha_vencimiento | date:'dd/MM/yyyy' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -94,7 +94,34 @@ export class CertificatesComponent implements OnInit {
   templateLoading = signal(false);
   templateInfoMessage = signal('');
 
+  // Bulk Creation Signals
+  searchTerm = signal('');
+  selectedUserIds = signal<Set<number>>(new Set());
+  isCreatingBatch = signal(false);
+  batchProgress = signal({ current: 0, total: 0 });
 
+  // Computed filtered users
+  filteredUsers = computed(() => {
+    const term = this.searchTerm().toLowerCase();
+    return this.users().filter(u =>
+      u.name.toLowerCase().includes(term) ||
+      u.email.toLowerCase().includes(term)
+    );
+  });
+
+
+
+  // Bulk Actions Signals
+  selectedCertificateIds = signal<Set<number>>(new Set());
+  isBulkProcessing = signal(false);
+  bulkProcessState = signal({
+    current: 0,
+    total: 0,
+    successCount: 0,
+    errorCount: 0,
+    action: '' as 'email' | 'delete' | ''
+  });
+  showBulkDeleteConfirmModal = signal(false);
 
   // Pagination
   currentPage = signal(1);
@@ -293,7 +320,7 @@ export class CertificatesComponent implements OnInit {
   openCreateModal(): void {
     // Reset con valores por defecto para evitar fallo en primer clic
     this.createForm.reset({
-      user_id: '',
+      user_id: '', // Will be ignored in batch mode if selectedUserIds has items
       id_template: '',
       nombre: '',
       descripcion: '',
@@ -303,6 +330,12 @@ export class CertificatesComponent implements OnInit {
       signed_by: '',
       status: 'issued'
     });
+    // Reset batch selection
+    this.selectedUserIds.set(new Set());
+    this.searchTerm.set('');
+    this.isCreatingBatch.set(false);
+    this.batchProgress.set({ current: 0, total: 0 });
+
     this.showCreateModal.set(true);
   }
 
@@ -471,51 +504,103 @@ export class CertificatesComponent implements OnInit {
     });
   }
 
-  // Crear certificado
+  // Crear certificado (Single or Batch)
   createCertificate(): void {
-    if (this.createForm.invalid) {
-      Object.values(this.createForm.controls).forEach(c => c.markAsTouched());
-      this.errorMessage.set('Completa los campos requeridos');
+    // Validate common fields
+    const commonControls = ['id_template', 'nombre', 'fecha_emision', 'activity_id'];
+    const isCommonValid = commonControls.every(field => this.createForm.get(field)?.valid);
+
+    if (!isCommonValid) {
+      commonControls.forEach(field => this.createForm.get(field)?.markAsTouched());
+      this.errorMessage.set('Completa los campos requeridos (Plantilla, Nombre, Fecha, Actividad)');
       return;
     }
-    this.isLoading.set(true);
-    const payload = this.createForm.value;
-    // Pre-check antes de crear
-    this.certificateService.precheckCreate(payload).subscribe({
-      next: (res) => {
-        const ok = !!res?.success && !!res?.data?.ready;
-        if (!ok) {
-          this.isLoading.set(false);
-          const details = res?.data?.details;
-          const msgs = Array.isArray(details?.errors) ? details.errors.join('; ') : (res?.message || 'Pre-check falló');
-          this.errorMessage.set(msgs);
-          return;
-        }
 
-        // Si todo listo, proceder a crear
-        this.certificateService.createCertificate(payload).subscribe({
-          next: (createRes) => {
-            this.isLoading.set(false);
-            if (createRes?.success) {
-              this.successMessage.set('Certificado creado correctamente');
-              this.closeModals();
-              this.createForm.reset({ status: 'issued', fecha_emision: this.todayDate });
-              this.loadCertificates(this.currentPage());
-            } else {
-              this.errorMessage.set(createRes?.message || 'No se pudo crear el certificado');
-            }
-          },
-          error: (createErr) => {
-            this.isLoading.set(false);
-            this.errorMessage.set(createErr?.error?.message || 'Error al crear el certificado');
-          }
-        });
+    const selectedIds = Array.from(this.selectedUserIds());
+    const singleUserId = this.createForm.get('user_id')?.value;
+
+    let targetUserIds: number[] = [];
+    if (selectedIds.length > 0) {
+      targetUserIds = selectedIds;
+    } else if (singleUserId) {
+      targetUserIds = [parseInt(singleUserId)];
+    } else {
+      this.errorMessage.set('Selecciona al menos un usuario');
+      return;
+    }
+
+    this.isLoading.set(true);
+
+    // Prepare data for bulk create
+    const certificatesData = targetUserIds.map(userId => ({
+      ...this.createForm.value,
+      user_id: userId
+    }));
+
+    if (targetUserIds.length > 1) {
+      this.isCreatingBatch.set(true);
+      this.batchProgress.set({ current: 0, total: targetUserIds.length }); // Indeterminate or just show total
+    }
+
+    this.certificateService.bulkCreate(certificatesData).subscribe({
+      next: (res: any) => {
+        this.isLoading.set(false);
+        this.isCreatingBatch.set(false);
+        if (res.success) {
+          const count = res.data?.count || targetUserIds.length;
+          this.successMessage.set(`Se han creado ${count} certificados correctamente.`);
+          this.closeModals();
+          this.createForm.reset({ status: 'issued', fecha_emision: this.todayDate });
+          this.loadCertificates(this.currentPage());
+        } else {
+          this.errorMessage.set(res.message || 'Error al crear certificados.');
+        }
       },
       error: (err) => {
         this.isLoading.set(false);
-        this.errorMessage.set(err?.error?.message || 'Error en pre-check antes de crear');
+        this.isCreatingBatch.set(false);
+        this.errorMessage.set(err?.error?.message || 'Error al crear certificados.');
+        console.error('Error creating certificates:', err);
       }
     });
+  }
+
+  // User Selection Methods
+  toggleUser(userId: number): void {
+    const current = this.selectedUserIds();
+    const newSet = new Set(current);
+    if (newSet.has(userId)) {
+      newSet.delete(userId);
+    } else {
+      newSet.add(userId);
+    }
+    this.selectedUserIds.set(newSet);
+  }
+
+  toggleAllUsers(): void {
+    const current = this.selectedUserIds();
+    const filtered = this.filteredUsers();
+
+    // If all filtered users are selected, deselect them. Otherwise select all filtered.
+    const allFilteredSelected = filtered.every(u => current.has(u.id));
+
+    const newSet = new Set(current);
+    if (allFilteredSelected) {
+      filtered.forEach(u => newSet.delete(u.id));
+    } else {
+      filtered.forEach(u => newSet.add(u.id));
+    }
+    this.selectedUserIds.set(newSet);
+  }
+
+  isSelected(userId: number): boolean {
+    return this.selectedUserIds().has(userId);
+  }
+
+  isAllSelected(): boolean {
+    const filtered = this.filteredUsers();
+    if (filtered.length === 0) return false;
+    return filtered.every(u => this.selectedUserIds().has(u.id));
   }
 
   // Actualizar certificado
@@ -597,6 +682,125 @@ export class CertificatesComponent implements OnInit {
         this.sendingEmailId.set(null);
         this.errorMessage.set('Error al enviar el certificado por correo electrónico.');
         console.error('Error sending certificate email:', error);
+      }
+    });
+  }
+
+  // Bulk Actions Methods
+
+  toggleCertificate(id: number): void {
+    const current = this.selectedCertificateIds();
+    const newSet = new Set(current);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    this.selectedCertificateIds.set(newSet);
+  }
+
+  toggleAllCertificates(): void {
+    const current = this.selectedCertificateIds();
+    const allIds = this.certificates().map(c => c.id);
+
+    // Check if all currently visible certificates are selected
+    const allSelected = allIds.every(id => current.has(id));
+
+    const newSet = new Set(current);
+    if (allSelected) {
+      // Deselect all visible
+      allIds.forEach(id => newSet.delete(id));
+    } else {
+      // Select all visible
+      allIds.forEach(id => newSet.add(id));
+    }
+    this.selectedCertificateIds.set(newSet);
+  }
+
+  isCertificateSelected(id: number): boolean {
+    return this.selectedCertificateIds().has(id);
+  }
+
+  isAllCertificatesSelected(): boolean {
+    const certs = this.certificates();
+    if (certs.length === 0) return false;
+    return certs.every(c => this.selectedCertificateIds().has(c.id));
+  }
+
+  // Bulk Send Emails
+  bulkSendEmails(): void {
+    const selectedIds = Array.from(this.selectedCertificateIds());
+    if (selectedIds.length === 0) return;
+
+    this.isBulkProcessing.set(true);
+    // Show indeterminate state or just "Processing..."
+    this.bulkProcessState.set({
+      current: 0,
+      total: selectedIds.length,
+      successCount: 0,
+      errorCount: 0,
+      action: 'email'
+    });
+
+    this.certificateService.bulkSendEmail(selectedIds).subscribe({
+      next: (res: any) => {
+        this.isBulkProcessing.set(false);
+        this.selectedCertificateIds.set(new Set()); // Clear selection
+        if (res.success) {
+          const queued = res.data?.queued || selectedIds.length;
+          this.successMessage.set(`Se han encolado ${queued} correos para envío en segundo plano.`);
+        } else {
+          this.errorMessage.set(res.message || 'Error al enviar correos.');
+        }
+      },
+      error: (err) => {
+        this.isBulkProcessing.set(false);
+        this.errorMessage.set(err?.error?.message || 'Error al enviar correos.');
+        console.error('Error sending bulk emails:', err);
+      }
+    });
+  }
+
+  // Bulk Delete
+  openBulkDeleteConfirm(): void {
+    if (this.selectedCertificateIds().size === 0) return;
+    this.showBulkDeleteConfirmModal.set(true);
+  }
+
+  closeBulkDeleteConfirm(): void {
+    this.showBulkDeleteConfirmModal.set(false);
+  }
+
+  bulkDeleteCertificates(): void {
+    const selectedIds = Array.from(this.selectedCertificateIds());
+    if (selectedIds.length === 0) return;
+
+    this.closeBulkDeleteConfirm();
+    this.isBulkProcessing.set(true);
+    this.bulkProcessState.set({
+      current: 0,
+      total: selectedIds.length,
+      successCount: 0,
+      errorCount: 0,
+      action: 'delete'
+    });
+
+    this.certificateService.bulkDelete(selectedIds).subscribe({
+      next: (res: any) => {
+        this.isBulkProcessing.set(false);
+        this.selectedCertificateIds.set(new Set()); // Clear selection
+        if (res.success) {
+          const deleted = res.data?.deleted || selectedIds.length;
+          this.successMessage.set(`Se han eliminado ${deleted} certificados exitosamente.`);
+          this.loadCertificates(this.currentPage());
+        } else {
+          this.errorMessage.set(res.message || 'Error al eliminar certificados.');
+        }
+      },
+      error: (err) => {
+        this.isBulkProcessing.set(false);
+        this.errorMessage.set(err?.error?.message || 'Error al eliminar certificados.');
+        console.error('Error deleting bulk certificates:', err);
       }
     });
   }

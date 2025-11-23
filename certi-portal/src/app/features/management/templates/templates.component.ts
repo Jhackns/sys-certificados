@@ -647,58 +647,68 @@ export class TemplatesComponent implements OnInit {
       formData.append('background_image_size[height]', String(bgSizeUpd.height));
     }
 
+    // Ensure editor_canvas_size is sent
     const canvasUpd = this.editorCanvasSize();
     if (canvasUpd) {
       formData.append('template_styles[editor_canvas_size][width]', String(Math.round(canvasUpd.width)));
       formData.append('template_styles[editor_canvas_size][height]', String(Math.round(canvasUpd.height)));
+    } else if (this.selectedTemplate()?.template_styles?.editor_canvas_size) {
+      // Fallback to existing canvas size
+      const existing = this.selectedTemplate()!.template_styles.editor_canvas_size;
+      formData.append('template_styles[editor_canvas_size][width]', String(existing.width));
+      formData.append('template_styles[editor_canvas_size][height]', String(existing.height));
     }
-    formData.append('template_styles[coords_origin]', 'center');
 
-    const hasEditor = this.editorElements().length > 0;
-    if (hasEditor) {
-      const bgOffUpdate = this.backgroundOffset();
-      formData.append('template_styles[background_offset][x]', String(Math.round(bgOffUpdate.x)));
-      formData.append('template_styles[background_offset][y]', String(Math.round(bgOffUpdate.y)));
-      this.editorElements().forEach(el => {
-        formData.append('template_styles[components][]', el.type);
-      });
+    // Append components list
+    this.editorElements().forEach(el => {
+      formData.append('template_styles[components][]', el.type);
+    });
 
-      const nameEl = this.editorElements().find(el => el.type === 'name');
-      const dateEl = this.editorElements().find(el => el.type === 'date');
-      const qrEl = this.editorElements().find(el => el.type === 'qr');
+    // Find elements
+    const nameEl = this.editorElements().find(el => el.type === 'name');
+    const dateEl = this.editorElements().find(el => el.type === 'date');
+    const qrEl = this.editorElements().find(el => el.type === 'qr');
 
-      if (nameEl) {
-        const namePos = this.computeOriginAdjusted(nameEl);
-        formData.append('name_position[x]', String(namePos.x));
-        formData.append('name_position[y]', String(namePos.y));
-        formData.append('name_position[left]', String(Math.round(nameEl.x)));
-        formData.append('name_position[top]', String(Math.round(nameEl.y)));
-        formData.append('name_position[fontSize]', String(nameEl.fontSize || 28));
-        formData.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
-        formData.append('name_position[color]', String(nameEl.color || '#000'));
-        formData.append('name_position[rotation]', String(nameEl.rotation || 0));
-      }
-      if (dateEl) {
-        const datePos = this.computeOriginAdjusted(dateEl);
-        formData.append('date_position[x]', String(datePos.x));
-        formData.append('date_position[y]', String(datePos.y));
-        formData.append('date_position[left]', String(Math.round(dateEl.x)));
-        formData.append('date_position[top]', String(Math.round(dateEl.y)));
-        formData.append('date_position[fontSize]', String(dateEl.fontSize || 16));
-        formData.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
-        formData.append('date_position[color]', String(dateEl.color || '#333'));
-        formData.append('date_position[rotation]', String(dateEl.rotation || 0));
-      }
-      if (qrEl) {
-        const qrPos = this.computeOriginAdjusted(qrEl);
-        formData.append('qr_position[x]', String(qrPos.x));
-        formData.append('qr_position[y]', String(qrPos.y));
-        formData.append('qr_position[left]', String(Math.round(qrEl.x)));
-        formData.append('qr_position[top]', String(Math.round(qrEl.y)));
-        formData.append('qr_position[width]', String(qrEl.width || 120));
-        formData.append('qr_position[height]', String(qrEl.height || 120));
-        formData.append('qr_position[rotation]', String(qrEl.rotation || 0));
-      }
+    // Name is required (enforced by validation, but good to be safe)
+    if (nameEl) {
+      const namePos = this.computeOriginAdjusted(nameEl);
+      formData.append('name_position[x]', String(namePos.x));
+      formData.append('name_position[y]', String(namePos.y));
+      formData.append('name_position[left]', String(Math.round(nameEl.x)));
+      formData.append('name_position[top]', String(Math.round(nameEl.y)));
+      formData.append('name_position[fontSize]', String(nameEl.fontSize || 28));
+      formData.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
+      formData.append('name_position[color]', String(nameEl.color || '#000'));
+      formData.append('name_position[rotation]', String(nameEl.rotation || 0));
+    }
+
+    // Date (Optional)
+    if (dateEl) {
+      const datePos = this.computeOriginAdjusted(dateEl);
+      formData.append('date_position[x]', String(datePos.x));
+      formData.append('date_position[y]', String(datePos.y));
+      formData.append('date_position[left]', String(Math.round(dateEl.x)));
+      formData.append('date_position[top]', String(Math.round(dateEl.y)));
+      formData.append('date_position[fontSize]', String(dateEl.fontSize || 16));
+      formData.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
+      formData.append('date_position[color]', String(dateEl.color || '#333'));
+      formData.append('date_position[rotation]', String(dateEl.rotation || 0));
+    } else {
+      formData.append('date_position', '');
+    }
+
+    // QR (Optional)
+    if (qrEl) {
+      const qrPos = this.computeOriginAdjusted(qrEl);
+      formData.append('qr_position[x]', String(qrPos.x));
+      formData.append('qr_position[y]', String(qrPos.y));
+      formData.append('qr_position[left]', String(Math.round(qrEl.x)));
+      formData.append('qr_position[top]', String(Math.round(qrEl.y)));
+      formData.append('qr_position[width]', String(qrEl.width || 120));
+      formData.append('qr_position[height]', String(qrEl.height || 120));
+      formData.append('qr_position[rotation]', String(qrEl.rotation || 0));
+    } else {
+      formData.append('qr_position', '');
     }
 
     const templateId = this.selectedTemplate()!.id;

@@ -62,4 +62,17 @@ export class CertificateService {
   getCertificatePreview(id: number): Observable<any> {
     return this.http.get(`${this.apiUrl}/${id}/preview`);
   }
+
+  // Bulk Operations
+  bulkCreate(data: any[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/bulk`, { certificates: data });
+  }
+
+  bulkSendEmail(ids: number[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/bulk-email`, { ids });
+  }
+
+  bulkDelete(ids: number[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/bulk-delete`, { ids });
+  }
 }

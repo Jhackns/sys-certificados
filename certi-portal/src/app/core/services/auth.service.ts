@@ -57,16 +57,11 @@ export class AuthService {
    * Realiza el login del usuario
    */
   login(credentials: LoginRequest): Observable<LoginResponse> {
-    console.log('Iniciando login con:', credentials);
     return this.http.post<LoginResponse>(`${this.API_URL}/auth/login`, credentials)
       .pipe(
         tap(response => {
-          console.log('Respuesta del servidor:', response);
           if (response.success && response.data) {
-            console.log('Login exitoso, estableciendo autenticación');
             this.setAuth(response.data.user, response.data.access_token);
-          } else {
-            console.log('Login falló:', response.message);
           }
         }),
         catchError(error => {
@@ -84,16 +79,11 @@ export class AuthService {
    * Registra un nuevo usuario
    */
   register(userData: RegisterRequest): Observable<LoginResponse> {
-    console.log('Iniciando registro con:', userData);
     return this.http.post<LoginResponse>(`${this.API_URL}/auth/register`, userData)
       .pipe(
         tap(response => {
-          console.log('Respuesta del servidor:', response);
           if (response.success && response.data) {
-            console.log('Registro exitoso, estableciendo autenticación');
             this.setAuth(response.data.user, response.data.access_token);
-          } else {
-            console.log('Registro falló:', response.message);
           }
         }),
         catchError(error => {
@@ -111,20 +101,16 @@ export class AuthService {
    * Cierra la sesión del usuario
    */
   logout(): void {
-    console.log('🔐 Cerrando sesión...');
     this.clearAuth();
     // No redirigir automáticamente aquí para evitar conflictos con la inicialización
-    console.log('✅ Sesión cerrada correctamente');
   }
 
   /**
    * Cierra la sesión del usuario y redirige al login
    */
   logoutAndRedirect(): void {
-    console.log('🔐 Cerrando sesión y redirigiendo...');
     this.clearAuth();
     this.router.navigate(['/login']);
-    console.log('✅ Sesión cerrada y redirigido a login');
   }
 
   /**
@@ -198,5 +184,28 @@ export class AuthService {
    */
   getAuthToken(): string | null {
     return this.authToken();
+  }
+
+  /**
+   * Verifica si el usuario tiene un permiso específico
+   */
+  hasPermission(permission: string): boolean {
+    const user = this.currentUser();
+    if (!user || !user.permissions) return false;
+
+    // Superadmin wildcard check (if roles are available)
+    if (user.roles && user.roles.includes('super_admin')) return true;
+
+    // Direct permission check
+    if (user.permissions.includes(permission)) return true;
+
+    // Wildcard check (e.g. 'users.*' matches 'users.read')
+    const parts = permission.split('.');
+    if (parts.length > 1) {
+      const wildcard = parts[0] + '.*';
+      if (user.permissions.includes(wildcard)) return true;
+    }
+
+    return false;
   }
 }

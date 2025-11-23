@@ -204,6 +204,56 @@ class CertificateService
     }
 
     /**
+     * Crear múltiples certificados
+     *
+     * @param array $dataArray Array de datos para cada certificado
+     * @return array Array de certificados creados
+     */
+    public function bulkCreate(array $dataArray): array
+    {
+        return DB::transaction(function () use ($dataArray) {
+            $createdCertificates = [];
+            
+            foreach ($dataArray as $data) {
+                try {
+                    $createdCertificates[] = $this->create($data);
+                } catch (\Exception $e) {
+                    Log::error('Error creando certificado en lote', ['data' => $data, 'error' => $e->getMessage()]);
+                    // Continuar con los siguientes o lanzar excepción según requerimiento. 
+                    // Aquí optamos por lanzar para que el transaction haga rollback si uno falla, 
+                    // o podríamos capturar y devolver errores parciales.
+                    // Dado que el frontend espera éxito total o fallo en batch, lanzamos.
+                    throw $e;
+                }
+            }
+
+            return $createdCertificates;
+        });
+    }
+
+    /**
+     * Eliminar múltiples certificados
+     *
+     * @param array $ids IDs de certificados a eliminar
+     * @return int Cantidad de certificados eliminados
+     */
+    public function bulkDelete(array $ids): int
+    {
+        return DB::transaction(function () use ($ids) {
+            $certificates = Certificate::whereIn('id', $ids)->get();
+            $count = 0;
+
+            foreach ($certificates as $certificate) {
+                if ($this->delete($certificate)) {
+                    $count++;
+                }
+            }
+
+            return $count;
+        });
+    }
+
+    /**
      * Buscar certificados por criterios
      *
      * @param array $criteria

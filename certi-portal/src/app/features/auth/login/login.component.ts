@@ -49,7 +49,9 @@ export class LoginComponent {
         },
         error: (error) => {
           this.isLoading.set(false);
-          this.errorMessage.set('Error de conexión. Intenta nuevamente.');
+          // Mostrar mensaje del backend si existe (error.error.message)
+          const msg = error?.error?.message || 'Error de conexión o credenciales incorrectas.';
+          this.errorMessage.set(msg);
           console.error('Login error:', error);
         }
       });

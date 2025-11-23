@@ -13,6 +13,8 @@ use App\Http\Controllers\API\Certificates\CertificateController;
 use App\Http\Controllers\API\Certificates\ValidationController;
 use App\Http\Controllers\API\Certificates\CertificateTemplateController;
 
+use App\Http\Controllers\API\DashboardController;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -64,6 +66,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout-all', [AuthController::class, 'logoutAll']);
         Route::put('/profile', [AuthController::class, 'updateProfile']);
     });
+
+    // === DASHBOARD ===
+    Route::get('/dashboard', [DashboardController::class, 'index']);
 
     /*
     |--------------------------------------------------------------------------
@@ -160,6 +165,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [CertificateController::class, 'store'])->middleware('permission:certificates.create');
         Route::put('/{id}', [CertificateController::class, 'update'])->middleware('permission:certificates.update');
         Route::delete('/{id}', [CertificateController::class, 'destroy'])->middleware('permission:certificates.delete');
+
+        // Bulk Operations
+        Route::post('/bulk', [CertificateController::class, 'bulkStore'])->middleware('permission:certificates.create');
+        Route::post('/bulk-email', [CertificateController::class, 'bulkSendEmail'])->middleware('permission:emails.send');
+        Route::post('/bulk-delete', [CertificateController::class, 'bulkDestroy'])->middleware('permission:certificates.delete');
 
         // Funcionalidades especiales de certificados
         Route::patch('/{id}/change-status', [CertificateController::class, 'changeStatus'])->middleware('permission:certificates.issue');

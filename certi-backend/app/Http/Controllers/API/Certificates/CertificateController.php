@@ -460,6 +460,12 @@ class CertificateController extends Controller
      * @param int $id
      * @return JsonResponse
      */
+    /**
+     * Eliminar un certificado
+     *
+     * @param int $id
+     * @return JsonResponse
+     */
     public function destroy($id): JsonResponse
     {
         try {
@@ -476,6 +482,104 @@ class CertificateController extends Controller
         } catch (\Exception $e) {
             Log::error('Error al eliminar certificado: ' . $e->getMessage());
             return $this->errorResponse('Error al eliminar certificado: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Crear múltiples certificados
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function bulkStore(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'certificates' => 'required|array|min:1',
+                'certificates.*.user_id' => 'required|exists:users,id',
+                'certificates.*.activity_id' => 'required|exists:activities,id',
+                'certificates.*.id_template' => 'required|exists:certificate_templates,id',
+                'certificates.*.nombre' => 'required|string',
+            ]);
+
+            $data = $request->input('certificates');
+            
+            // Asegurar campos por defecto
+            foreach ($data as &$certData) {
+                if (!isset($certData['status'])) {
+                    $certData['status'] = 'issued';
+                }
+            }
+
+            $certificates = $this->certificateService->bulkCreate($data);
+
+            return $this->successResponse([
+                'count' => count($certificates),
+                'ids' => collect($certificates)->pluck('id')
+            ], 'Certificados creados exitosamente en lote', Response::HTTP_CREATED);
+
+        } catch (\Exception $e) {
+            Log::error('Error en bulkStore: ' . $e->getMessage());
+            return $this->errorResponse('Error al crear certificados en lote: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Enviar múltiples correos
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function bulkSendEmail(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'ids' => 'required|array|min:1',
+                'ids.*' => 'integer|exists:certificates,id'
+            ]);
+
+            $ids = $request->input('ids');
+            $count = 0;
+
+            foreach ($ids as $id) {
+                \App\Jobs\SendCertificateEmailJob::dispatch($id);
+                $count++;
+            }
+
+            return $this->successResponse([
+                'queued' => $count
+            ], "Se han encolado {$count} correos para envío en segundo plano");
+
+        } catch (\Exception $e) {
+            Log::error('Error en bulkSendEmail: ' . $e->getMessage());
+            return $this->errorResponse('Error al encolar correos: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Eliminar múltiples certificados
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'ids' => 'required|array|min:1',
+                'ids.*' => 'integer|exists:certificates,id'
+            ]);
+
+            $ids = $request->input('ids');
+            $deletedCount = $this->certificateService->bulkDelete($ids);
+
+            return $this->successResponse([
+                'deleted' => $deletedCount
+            ], "Se han eliminado {$deletedCount} certificados exitosamente");
+
+        } catch (\Exception $e) {
+            Log::error('Error en bulkDestroy: ' . $e->getMessage());
+            return $this->errorResponse('Error al eliminar certificados en lote: ' . $e->getMessage(), 500);
         }
     }
 

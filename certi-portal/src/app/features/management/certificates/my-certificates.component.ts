@@ -38,166 +38,7 @@ interface ApiResponse<T = any> {
   selector: 'app-my-certificates',
   standalone: true,
   imports: [CommonModule],
-  template: `
-  <div class="page">
-    <div class="page-header">
-      <div class="header-content">
-        <div class="header-text">
-          <h1>Mis Certificados</h1>
-          <p>Certificados asociados a tu cuenta</p>
-        </div>
-        <div class="header-stats">
-          <div class="stat-card">
-            <span class="stat-number">{{ certificates().length }}</span>
-            <span class="stat-label">Total</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div *ngIf="isLoading()" class="loading-state">
-      <div class="loading-spinner"></div>
-      <p>Cargando certificados...</p>
-    </div>
-
-    <div *ngIf="errorMessage()" class="error-state">
-      <i class="icon-alert"></i>
-      <p>{{ errorMessage() }}</p>
-    </div>
-
-    <div *ngIf="!isLoading() && !errorMessage() && certificates().length === 0" class="empty-state">
-      <div class="empty-icon">📜</div>
-      <h3>No tienes certificados</h3>
-      <p>Aún no se te han emitido certificados</p>
-    </div>
-
-    <div *ngIf="!isLoading() && !errorMessage() && certificates().length > 0" class="certificates-grid">
-      <div *ngFor="let certificate of certificates()" class="certificate-card">
-        <div class="certificate-header">
-          <div class="certificate-code">
-            <span class="code-label">Código</span>
-            <span class="code-value">{{ certificate.unique_code }}</span>
-          </div>
-          <div class="certificate-status" [class]="'status-' + certificate.status">
-            {{ getStatusLabel(certificate.status) }}
-          </div>
-        </div>
-
-        <div class="certificate-content">
-          <h3 class="certificate-title">{{ certificate.nombre || 'Certificado' }}</h3>
-
-          <div class="certificate-details">
-            <div class="detail-item">
-              <i class="icon-activity"></i>
-              <span class="detail-label">Actividad:</span>
-              <span class="detail-value">{{ certificate.activity?.name || 'No especificada' }}</span>
-            </div>
-
-            <div class="detail-item">
-              <i class="icon-template"></i>
-              <span class="detail-label">Plantilla:</span>
-              <span class="detail-value">{{ certificate.template?.name || 'No especificada' }}</span>
-            </div>
-
-            <div class="detail-item">
-              <i class="icon-calendar"></i>
-              <span class="detail-label">Fecha de emisión:</span>
-              <span class="detail-value">{{ certificate.fecha_emision ? (certificate.fecha_emision | date:'dd/MM/yyyy') : 'No especificada' }}</span>
-            </div>
-
-            <div *ngIf="certificate.fecha_vencimiento" class="detail-item">
-              <i class="icon-clock"></i>
-              <span class="detail-label">Fecha de vencimiento:</span>
-              <span class="detail-value">{{ certificate.fecha_vencimiento | date:'dd/MM/yyyy' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="certificate-actions">
-          <button
-            class="btn-view"
-            (click)="viewCertificate(certificate)"
-            title="Ver detalles del certificado">
-            <i class="icon-eye"></i>
-            Ver Certificado
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal de vista detallada -->
-    <div *ngIf="showDetailModal()" class="modal-overlay" (click)="closeDetailModal()">
-      <div class="modal-detail" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h2>Detalles del Certificado</h2>
-          <button class="btn-close" (click)="closeDetailModal()">
-            <i class="icon-x"></i>
-          </button>
-        </div>
-
-        <div class="modal-body" *ngIf="selectedCertificate()">
-          <div class="certificate-preview">
-            <div *ngIf="certificatePreview()" class="preview-container">
-              <img [src]="certificatePreview()" alt="Vista previa del certificado" class="preview-image">
-            </div>
-            <div *ngIf="!certificatePreview() && !loadingPreview()" class="preview-placeholder">
-              <i class="icon-image"></i>
-              <p>Vista previa no disponible</p>
-            </div>
-            <div *ngIf="loadingPreview()" class="preview-loading">
-              <div class="loading-spinner"></div>
-              <p>Cargando vista previa...</p>
-            </div>
-          </div>
-
-          <div class="certificate-info">
-            <div class="info-section">
-              <h3>Información General</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <label>Código único:</label>
-                  <span>{{ selectedCertificate()?.unique_code }}</span>
-                </div>
-                <div class="info-item">
-                  <label>Nombre:</label>
-                  <span>{{ selectedCertificate()?.nombre || 'No especificado' }}</span>
-                </div>
-                <div class="info-item">
-                  <label>Estado:</label>
-                  <span class="status-badge" [class]="'status-' + selectedCertificate()?.status">
-                    {{ getStatusLabel(selectedCertificate()?.status || '') }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="info-section">
-              <h3>Detalles de Emisión</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <label>Actividad:</label>
-                  <span>{{ selectedCertificate()?.activity?.name || 'No especificada' }}</span>
-                </div>
-                <div class="info-item">
-                  <label>Plantilla:</label>
-                  <span>{{ selectedCertificate()?.template?.name || 'No especificada' }}</span>
-                </div>
-                <div class="info-item">
-                  <label>Fecha de emisión:</label>
-                  <span>{{ selectedCertificate()?.fecha_emision ? (selectedCertificate()?.fecha_emision | date:'dd/MM/yyyy HH:mm') : 'No especificada' }}</span>
-                </div>
-                <div *ngIf="selectedCertificate()?.fecha_vencimiento" class="info-item">
-                  <label>Fecha de vencimiento:</label>
-                  <span>{{ selectedCertificate()?.fecha_vencimiento | date:'dd/MM/yyyy' }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  `,
+  templateUrl: './my-certificates.component.html',
   styles: [`
     .page {
       padding: 24px;
@@ -615,6 +456,77 @@ interface ApiResponse<T = any> {
       display: inline-block;
     }
 
+    /* Download Options */
+    .download-options {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .btn-download-pdf,
+    .btn-download-jpg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 16px;
+      border: 2px solid;
+      border-radius: 12px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+
+    .btn-download-pdf {
+      border-color: #dc3545;
+      color: #dc3545;
+    }
+
+    .btn-download-pdf:hover:not(:disabled) {
+      background: #dc3545;
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+    }
+
+    .btn-download-jpg {
+      border-color: #28a745;
+      color: #28a745;
+    }
+
+    .btn-download-jpg:hover:not(:disabled) {
+      background: #28a745;
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    }
+
+    .btn-download-pdf:disabled,
+    .btn-download-jpg:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-download-pdf i,
+    .btn-download-jpg i {
+      font-size: 1.5rem;
+    }
+
+    .btn-download-pdf span,
+    .btn-download-jpg span {
+      font-size: 1rem;
+    }
+
+    .btn-download-pdf small,
+    .btn-download-jpg small {
+      font-size: 0.75rem;
+      font-weight: 400;
+      opacity: 0.8;
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
       .certificates-grid {
@@ -710,6 +622,48 @@ export class MyCertificatesComponent implements OnInit {
     this.certificatePreview.set(null);
   }
 
+  // Download state
+  downloadingPdf = signal(false);
+  downloadingImage = signal(false);
+
+  async downloadCertificateFormat(format: 'pdf' | 'jpg') {
+    if (!this.selectedCertificate()) return;
+
+    const certificateId = this.selectedCertificate()!.id;
+    const isDownloadingPdf = format === 'pdf';
+
+    if (isDownloadingPdf) {
+      this.downloadingPdf.set(true);
+    } else {
+      this.downloadingImage.set(true);
+    }
+
+    try {
+      const blob = await this.certificateService.downloadCertificateFormat(certificateId, format).toPromise();
+
+      if (!blob) {
+        throw new Error('No se pudo descargar el certificado');
+      }
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `certificado_${this.selectedCertificate()!.unique_code}.${format}`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(`Error downloading certificate as ${format}:`, error);
+      alert(`Error al descargar el certificado como ${format.toUpperCase()}`);
+    } finally {
+      if (isDownloadingPdf) {
+        this.downloadingPdf.set(false);
+      } else {
+        this.downloadingImage.set(false);
+      }
+    }
+  }
+
   getStatusLabel(status: string): string {
     const statusMap: { [key: string]: string } = {
       'active': 'Activo',
@@ -720,5 +674,6 @@ export class MyCertificatesComponent implements OnInit {
     return statusMap[status] || status;
   }
 }
+
 
 

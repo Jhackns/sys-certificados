@@ -17,7 +17,7 @@ export class SidebarComponent {
   constructor(
     private authService: AuthService,
     private router: Router
-  ) {}
+  ) { }
 
   toggleSidebar(): void {
     this.isCollapsed.set(!this.isCollapsed());
@@ -29,5 +29,9 @@ export class SidebarComponent {
 
   navigateTo(route: string): void {
     this.router.navigate([route]);
+  }
+
+  hasPermission(permission: string): boolean {
+    return this.authService.hasPermission(permission);
   }
 }

@@ -25,9 +25,9 @@ class UserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        // Solo el super_admin puede listar usuarios
-        if (!$request->user()->hasRole('super_admin')) {
-            return $this->forbiddenResponse('Solo el super admin puede listar usuarios');
+        // Verificar permiso users.read en lugar de rol super_admin
+        if (!$request->user()->can('users.read')) {
+            return $this->forbiddenResponse('No tienes permiso para listar usuarios');
         }
 
         try {
@@ -150,8 +150,10 @@ class UserController extends Controller
                 'last_login' => null,
             ]);
 
-            // Asignar roles
-            $user->assignRole($request->roles);
+            // Asignar roles (asegurar que solo sea uno si se envía un array, o limpiar previos)
+            // El frontend envía un array, pero queremos forzar rol único.
+            // syncRoles reemplaza los roles anteriores.
+            $user->syncRoles($request->roles);
 
             return $this->successResponse([
                 'user' => new UserResource($user->load(['roles'])) // Elimina 'company'
@@ -203,7 +205,7 @@ class UserController extends Controller
 
             $user->update($data);
 
-            // Actualizar roles si se proporcionan
+            // Actualizar roles si se proporcionan (reemplazar existentes)
             if ($request->has('roles')) {
                 $user->syncRoles($request->roles);
             }

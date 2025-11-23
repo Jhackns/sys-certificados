@@ -98,43 +98,30 @@ class DatabaseSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permission], ['guard_name' => 'web']);
         }
 
-        // Crear roles y asignar permisos solo si no existen
+        // 1. Super Admin: Acceso Total
         $superAdminRole = Role::firstOrCreate(['name' => 'super_admin'], ['guard_name' => 'web']);
         $superAdminRole->syncPermissions(Permission::all());
 
-        $adminRole = Role::firstOrCreate(['name' => 'administrador'], ['guard_name' => 'web']);
-        $adminRole->syncPermissions([
-            'users.create', 'users.read', 'users.update', 'users.delete', 'users.assign_roles',
-            'roles.read', 'permissions.read', 'permissions.assign',
-            'companies.read', 'companies.update', 'companies.manage_own',
-            'activities.create', 'activities.read', 'activities.update', 'activities.delete', 'activities.manage_own',
-            'certificates.create', 'certificates.read', 'certificates.update', 'certificates.delete',
-            'certificates.issue', 'certificates.revoke', 'certificates.validate', 'certificates.download', 'certificates.manage_own',
-            'templates.create', 'templates.read', 'templates.update', 'templates.delete', 'templates.manage_own',
-            'validations.read', 'validations.create', 'validations.manage_own',
-            'documents.upload', 'documents.download', 'documents.delete', 'documents.manage_own',
-            'emails.send', 'emails.read', 'emails.resend', 'emails.manage_own',
-            'reports.certificates', 'reports.validations', 'reports.activities', 'reports.users', 'reports.export',
-        ]);
-
+        // 2. Emisor: Gestión de negocio (Actividades, Plantillas, Certificados)
         $emisorRole = Role::firstOrCreate(['name' => 'emisor'], ['guard_name' => 'web']);
         $emisorRole->syncPermissions([
-            'users.read', 'companies.read', 'companies.manage_own',
-            'activities.create', 'activities.read', 'activities.update', 'activities.manage_own',
+            // Usuarios (Solo lectura para poder seleccionar al emitir)
+            'users.read',
+            // Actividades
+            'activities.create', 'activities.read', 'activities.update', 'activities.delete', 'activities.manage_own',
+            // Plantillas
+            'templates.create', 'templates.read', 'templates.update', 'templates.delete', 'templates.manage_own',
+            // Certificados
             'certificates.create', 'certificates.read', 'certificates.issue', 'certificates.download', 'certificates.manage_own',
-            'templates.read', 'templates.manage_own', 'validations.read', 'validations.manage_own',
+            // Documentos (para subir imágenes/recursos)
             'documents.upload', 'documents.download', 'documents.manage_own',
+            // Correos (para enviar certificados)
             'emails.send', 'emails.read', 'emails.resend', 'emails.manage_own',
+            // Reportes básicos
             'reports.certificates', 'reports.activities',
         ]);
 
-        $validadorRole = Role::firstOrCreate(['name' => 'validador'], ['guard_name' => 'web']);
-        $validadorRole->syncPermissions([
-            'certificates.read', 'certificates.validate', 'certificates.download',
-            'validations.read', 'validations.create',
-            'companies.read', 'activities.read',
-        ]);
-
+        // 3. Usuario Final: Solo visualización
         $usuarioFinalRole = Role::firstOrCreate(['name' => 'usuario_final'], ['guard_name' => 'web']);
         $usuarioFinalRole->syncPermissions([
             'certificates.read', 'certificates.download', 'certificates.manage_own',
@@ -142,16 +129,16 @@ class DatabaseSeeder extends Seeder
             'documents.download', 'documents.manage_own',
         ]);
 
+        // Eliminar roles obsoletos si existen
+        Role::whereIn('name', ['administrador', 'validador'])->delete();
+
         $this->command->info('  × Roles y permisos creados correctamente');
 
-        // Normalización defensiva (por si existen registros previos inconsistentes)
-        // - Asegurar guard_name = 'web' en roles y permisos
-        // - Asegurar model_type correcto en pivotes
+        // Normalización defensiva
         try {
             Role::query()->whereNull('guard_name')->orWhere('guard_name', '')->update(['guard_name' => 'web']);
             Permission::query()->whereNull('guard_name')->orWhere('guard_name', '')->update(['guard_name' => 'web']);
 
-            // Arreglar model_type a User::class si viene nulo o vacío
             DB::table(config('permission.table_names.model_has_roles'))
                 ->whereNull('model_type')
                 ->orWhere('model_type', '=','')
@@ -169,15 +156,14 @@ class DatabaseSeeder extends Seeder
     /**
      * Usuarios de Prueba
      *
-     * Genera 5 usuarios predefinidos: un super administrador, un administrador,
-     * un emisor, un validador y un usuario final, cada uno con credenciales
-     * de acceso y perfiles completos.
+     * Genera 3 usuarios predefinidos: un super administrador,
+     * un emisor y un usuario final.
      */
     private function createTestUsers(): void
     {
         $this->command->info('× Creando usuarios de prueba...');
 
-        // Solo crea usuarios de prueba si no existen
+        // Super Admin
         $superAdmin = User::firstOrCreate(
             ['email' => 'superadmin@certificados.com'],
             [
@@ -192,24 +178,9 @@ class DatabaseSeeder extends Seeder
                 'last_login' => now(),
             ]
         );
-        $superAdmin->assignRole('super_admin');
+        $superAdmin->syncRoles(['super_admin']);
 
-        $admin = User::firstOrCreate(
-            ['email' => 'admin@certificaciones.com'],
-            [
-                'name' => 'Administrador Principal',
-                'password' => Hash::make('Admin123!'),
-                'email_verified_at' => now(),
-                'fecha_nacimiento' => '1985-05-20',
-                'pais' => 'México',
-                'genero' => 'Masculino',
-                'telefono' => '+52 5512345678',
-                'activo' => true,
-                'last_login' => now(),
-            ]
-        );
-        $admin->assignRole('administrador');
-
+        // Emisor
         $emisor = User::firstOrCreate(
             ['email' => 'emisor@certificaciones.com'],
             [
@@ -224,24 +195,9 @@ class DatabaseSeeder extends Seeder
                 'last_login' => now(),
             ]
         );
-        $emisor->assignRole('emisor');
+        $emisor->syncRoles(['emisor']);
 
-        $validador = User::firstOrCreate(
-            ['email' => 'validador@certificaciones.com'],
-            [
-                'name' => 'María Validadora',
-                'password' => Hash::make('Validador123!'),
-                'email_verified_at' => now(),
-                'fecha_nacimiento' => '1988-03-25',
-                'pais' => 'Argentina',
-                'genero' => 'Femenino',
-                'telefono' => '+54 1123456789',
-                'activo' => true,
-                'last_login' => now(),
-            ]
-        );
-        $validador->assignRole('validador');
-
+        // Usuario Final
         $usuarioFinal = User::firstOrCreate(
             ['email' => 'estudiante@ejemplo.com'],
             [
@@ -256,7 +212,10 @@ class DatabaseSeeder extends Seeder
                 'last_login' => now(),
             ]
         );
-        $usuarioFinal->assignRole('usuario_final');
+        $usuarioFinal->syncRoles(['usuario_final']);
+
+        // Eliminar usuarios de roles obsoletos si es necesario (opcional, por ahora solo creamos los nuevos)
+        // User::whereIn('email', ['admin@certificaciones.com', 'validador@certificaciones.com'])->delete();
 
         $this->command->info('  × Usuarios de prueba creados correctamente');
     }
