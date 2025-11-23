@@ -134,11 +134,21 @@ class CertificateImageService
                     'raw_pos_px' => $namePos,
                     'coords_origin' => $origin
                 ]);
-                // Escalar posiciones y tamaños, respetando origen de coordenadas
-                $rawX = (int)($namePos['x'] ?? 0) + ($isCenter ? (int)round($centerX) : 0);
-                $rawY = (int)($namePos['y'] ?? 0) + ($isCenter ? (int)round($centerY) : 0);
+                
+                // Determinar si usamos coordenadas absolutas (left/top) o relativas (x/y)
+                $useAbsolute = isset($namePos['left']) && isset($namePos['top']);
+                
+                if ($useAbsolute) {
+                    $rawX = (int)$namePos['left'];
+                    $rawY = (int)$namePos['top'];
+                } else {
+                    $rawX = (int)($namePos['x'] ?? 0) + ($isCenter ? (int)round($centerX) : 0);
+                    $rawY = (int)($namePos['y'] ?? 0) + ($isCenter ? (int)round($centerY) : 0);
+                }
+
                 $namePos['x'] = (int)round($rawX * $scaleX) - (int)round($offsetX * $scaleX);
                 $namePos['y'] = (int)round($rawY * $scaleY) - (int)round($offsetY * $scaleY);
+                
                 if (isset($namePos['fontSize'])) {
                     $namePos['fontSize'] = (int)max(8, round(((int)$namePos['fontSize']) * $uniform));
                 }
@@ -162,10 +172,20 @@ class CertificateImageService
                     'raw_pos_px' => $datePos,
                     'coords_origin' => $origin
                 ]);
-                $rawX = (int)($datePos['x'] ?? 0) + ($isCenter ? (int)round($centerX) : 0);
-                $rawY = (int)($datePos['y'] ?? 0) + ($isCenter ? (int)round($centerY) : 0);
+                
+                $useAbsolute = isset($datePos['left']) && isset($datePos['top']);
+                
+                if ($useAbsolute) {
+                    $rawX = (int)$datePos['left'];
+                    $rawY = (int)$datePos['top'];
+                } else {
+                    $rawX = (int)($datePos['x'] ?? 0) + ($isCenter ? (int)round($centerX) : 0);
+                    $rawY = (int)($datePos['y'] ?? 0) + ($isCenter ? (int)round($centerY) : 0);
+                }
+
                 $datePos['x'] = (int)round($rawX * $scaleX) - (int)round($offsetX * $scaleX);
                 $datePos['y'] = (int)round($rawY * $scaleY) - (int)round($offsetY * $scaleY);
+                
                 if (isset($datePos['fontSize'])) {
                     $datePos['fontSize'] = (int)max(8, round(((int)$datePos['fontSize']) * $uniform));
                 }
@@ -191,10 +211,20 @@ class CertificateImageService
                         'resolved_qr_path' => $resolvedQrPath,
                         'coords_origin' => $origin
                     ]);
-                    $rawX = (int)($qrPos['x'] ?? 0) + ($isCenter ? (int)round($centerX) : 0);
-                    $rawY = (int)($qrPos['y'] ?? 0) + ($isCenter ? (int)round($centerY) : 0);
+                    
+                    $useAbsolute = isset($qrPos['left']) && isset($qrPos['top']);
+                    
+                    if ($useAbsolute) {
+                        $rawX = (int)$qrPos['left'];
+                        $rawY = (int)$qrPos['top'];
+                    } else {
+                        $rawX = (int)($qrPos['x'] ?? 0) + ($isCenter ? (int)round($centerX) : 0);
+                        $rawY = (int)($qrPos['y'] ?? 0) + ($isCenter ? (int)round($centerY) : 0);
+                    }
+
                     $qrPos['x'] = (int)round($rawX * $scaleX) - (int)round($offsetX * $scaleX);
                     $qrPos['y'] = (int)round($rawY * $scaleY) - (int)round($offsetY * $scaleY);
+                    
                     if (isset($qrPos['width'])) {
                         $qrPos['width'] = (int)max(40, round(((int)$qrPos['width']) * $uniform));
                     }
@@ -604,6 +634,10 @@ class CertificateImageService
             $p = $map($p, 'colour', 'color');
             $data['x'] = isset($p['x']) ? (int)$p['x'] : null;
             $data['y'] = isset($p['y']) ? (int)$p['y'] : null;
+            // Add support for absolute coords
+            if (isset($p['left'])) $data['left'] = (int)$p['left'];
+            if (isset($p['top'])) $data['top'] = (int)$p['top'];
+
             if ($type === 'qr') {
                 if (isset($p['width'])) $data['width'] = (int)$p['width'];
                 if (isset($p['height'])) $data['height'] = (int)$p['height'];

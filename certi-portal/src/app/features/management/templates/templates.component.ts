@@ -94,10 +94,10 @@ export class TemplatesComponent implements OnInit {
     this.backgroundOffset.set({ x: Math.round(offX), y: Math.round(offY) });
 
     // Preserve editor canvas size
-    // Preserve editor canvas size
     const canvasSz = full?.template_styles?.editor_canvas_size;
     let savedW = 0;
     let savedH = 0;
+
     if (canvasSz && canvasSz.width && canvasSz.height) {
       savedW = Number(canvasSz.width);
       savedH = Number(canvasSz.height);
@@ -106,7 +106,19 @@ export class TemplatesComponent implements OnInit {
         height: savedH
       });
     } else {
-      this.editorCanvasSize.set(null);
+      // Fallback to background image size if available (for legacy templates)
+      const bgSz = full?.background_image_size;
+      if (bgSz && bgSz.width && bgSz.height) {
+        savedW = Number(bgSz.width);
+        savedH = Number(bgSz.height);
+        // Set it as editor canvas size so it gets saved on next update
+        this.editorCanvasSize.set({
+          width: savedW,
+          height: savedH
+        });
+      } else {
+        this.editorCanvasSize.set(null);
+      }
     }
 
     // Helper to resolve absolute coordinates
@@ -114,7 +126,7 @@ export class TemplatesComponent implements OnInit {
       if (pos.left != null) return Number(pos.left);
       // Si solo tenemos X relativo y conocemos el ancho original, convertimos
       if (pos.x != null && savedW > 0) return Number(pos.x) + (savedW / 2);
-      // Fallback (probablemente incorrecto si es relativo pero no hay otra opción)
+      // Fallback: si no hay savedW, asumimos que x ya es absoluto o no podemos convertir
       return pos.x != null ? Number(pos.x) : null;
     };
 

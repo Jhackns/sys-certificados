@@ -37,7 +37,7 @@ export interface TemplatePreviewData {
 
         <!-- Elemento QR -->
         <div
-          *ngIf="template?.qr_position && showElements && qrUrl"
+          *ngIf="template?.qr_position && showElements && qrUrl && imageLoaded()"
           class="qr-element"
           [style.left.px]="getQrLeft()"
           [style.top.px]="getQrTop()"
@@ -50,7 +50,7 @@ export interface TemplatePreviewData {
 
         <!-- Elemento Nombre -->
         <div
-          *ngIf="template?.name_position && showElements"
+          *ngIf="template?.name_position && showElements && imageLoaded()"
           class="name-element"
           [style.left.px]="getNameLeft()"
           [style.top.px]="getNameTop()"
@@ -64,7 +64,7 @@ export interface TemplatePreviewData {
 
         <!-- Elemento Fecha -->
         <div
-          *ngIf="template?.date_position && showElements"
+          *ngIf="template?.date_position && showElements && imageLoaded()"
           class="date-element"
           [style.left.px]="getDateLeft()"
           [style.top.px]="getDateTop()"
