@@ -27,12 +27,7 @@
     <form [formGroup]="filterForm" class="filters-form">
       <div class="search-box">
         <i class="fas fa-search"></i>
-        <input
-          type="text"
-          class="form-control"
-          placeholder="Buscar plantillas..."
-          formControlName="search"
-        >
+        <input type="text" class="form-control" placeholder="Buscar plantillas..." formControlName="search">
       </div>
 
       <div class="filter-group">
@@ -75,9 +70,9 @@
     <div *ngIf="errorMessage() && !isLoading()" class="error-state">
       <div class="error-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="15" y1="9" x2="9" y2="15"/>
-          <line x1="9" y1="9" x2="15" y2="15"/>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
         </svg>
       </div>
       <h3>Error al cargar plantillas</h3>
@@ -111,13 +106,8 @@
           <tr *ngFor="let template of filteredTemplates()" class="template-row">
             <td>
               <div class="template-preview">
-                <img
-                  *ngIf="template.file_url"
-                  [src]="template.file_url"
-                  [alt]="template.name"
-                  class="preview-thumbnail"
-                  title="Vista previa"
-                >
+                <img *ngIf="template.file_url" [src]="template.file_url" [alt]="template.name" class="preview-thumbnail"
+                  title="Vista previa">
                 <div *ngIf="!template.file_url" class="no-preview">
                   <i class="fas fa-image"></i>
                   <span>Sin imagen</span>
@@ -143,19 +133,13 @@
             <td>{{ template.created_at | date:'dd/MM/yyyy' }}</td>
             <td>
               <div class="action-buttons">
-                <button
-                  class="btn btn-sm btn-outline-secondary"
-                  (click)="openEditModal(template)"
-                  title="Editar plantilla"
-                >
+                <button class="btn btn-sm btn-outline-secondary" (click)="openEditModal(template)"
+                  title="Editar plantilla">
                   <i class="fas fa-edit"></i>
                 </button>
-                <button
-                  class="btn btn-sm btn-outline-danger"
-                  (click)="openDeleteModal(template)"
+                <button class="btn btn-sm btn-outline-danger" (click)="openDeleteModal(template)"
                   [disabled]="(template.certificates_count || 0) > 0"
-                  [title]="(template.certificates_count || 0) > 0 ? 'No se puede eliminar: plantilla en uso (' + (template.certificates_count || 0) + ')' : 'Eliminar plantilla'"
-                >
+                  [title]="(template.certificates_count || 0) > 0 ? 'No se puede eliminar: plantilla en uso (' + (template.certificates_count || 0) + ')' : 'Eliminar plantilla'">
                   <i class="fas fa-trash"></i>
                 </button>
                 <small class="inline-hint" *ngIf="(template.certificates_count || 0) > 0">
@@ -177,28 +161,16 @@
     </div>
 
     <nav class="pagination">
-      <button
-        class="page-link"
-        [disabled]="currentPage() === 1"
-        (click)="goToPage(currentPage() - 1)"
-      >
+      <button class="page-link" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)">
         <i class="fas fa-chevron-left"></i>
       </button>
 
-      <button
-        *ngFor="let page of [].constructor(totalPages()); let i = index"
-        class="page-link"
-        [class.active]="currentPage() === i + 1"
-        (click)="goToPage(i + 1)"
-      >
+      <button *ngFor="let page of [].constructor(totalPages()); let i = index" class="page-link"
+        [class.active]="currentPage() === i + 1" (click)="goToPage(i + 1)">
         {{ i + 1 }}
       </button>
 
-      <button
-        class="page-link"
-        [disabled]="currentPage() === totalPages()"
-        (click)="goToPage(currentPage() + 1)"
-      >
+      <button class="page-link" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)">
         <i class="fas fa-chevron-right"></i>
       </button>
     </nav>
@@ -221,26 +193,18 @@
       <div class="modal-body">
         <div class="form-group">
           <label>Nombre *</label>
-          <input
-            class="form-control"
-            type="text"
-            formControlName="name"
-            placeholder="Nombre de la plantilla"
-          >
+          <input class="form-control" type="text" formControlName="name" placeholder="Nombre de la plantilla">
           <div class="error-message" *ngIf="templateForm.get('name')?.touched && templateForm.get('name')?.errors">
             <span *ngIf="templateForm.get('name')?.errors?.['required']">El nombre es requerido</span>
-            <span *ngIf="templateForm.get('name')?.errors?.['minlength']">El nombre debe tener al menos 3 caracteres</span>
+            <span *ngIf="templateForm.get('name')?.errors?.['minlength']">El nombre debe tener al menos 3
+              caracteres</span>
           </div>
         </div>
 
         <div class="form-group">
           <label>Descripción</label>
-          <textarea
-            class="form-control"
-            formControlName="description"
-            placeholder="Descripción de la plantilla"
-            rows="3"
-          ></textarea>
+          <textarea class="form-control" formControlName="description" placeholder="Descripción de la plantilla"
+            rows="3"></textarea>
         </div>
 
         <div class="form-group">
@@ -265,17 +229,21 @@
         <div class="form-group">
           <label>Imagen de Fondo de Plantilla *</label>
           <div class="file-upload-container">
-            <input id="templateFileInput" class="file-input" type="file" accept="image/*" (change)="onTemplateFileSelected($event)">
+            <input id="templateFileInput" class="file-input" type="file" accept="image/*"
+              (change)="onTemplateFileSelected($event)">
             <label for="templateFileInput" class="file-upload-label">
               <i class="fas fa-upload"></i>
               <span>Selecciona una imagen (JPG/PNG)</span>
             </label>
             <small class="text-muted">Se usará como fondo del certificado.</small>
-            <div class="hint-message hint-warning" *ngIf="!uploadedPreviewUrl">Sube una imagen de plantilla antes de crear</div>
-            <div class="hint-message hint-success" *ngIf="uploadedPreviewUrl">Posiciona tus componentes dentro de la imagen</div>
+            <div class="hint-message hint-warning" *ngIf="!uploadedPreviewUrl">Sube una imagen de plantilla antes de
+              crear</div>
+            <div class="hint-message hint-success" *ngIf="uploadedPreviewUrl">Posiciona tus componentes dentro de la
+              imagen</div>
             <div class="image-preview-container" *ngIf="uploadedPreviewUrl">
               <img [src]="uploadedPreviewUrl" alt="Vista previa" class="template-preview-image">
-              <button type="button" class="btn-remove-image" (click)="removeSelectedImage()" title="Quitar imagen">×</button>
+              <button type="button" class="btn-remove-image" (click)="removeSelectedImage()"
+                title="Quitar imagen">×</button>
             </div>
           </div>
           <div class="position-editor-section" *ngIf="uploadedPreviewUrl">
@@ -294,11 +262,7 @@
         <button type="button" class="btn btn-secondary" (click)="closeModals()">
           Cancelar
         </button>
-        <button
-           type="submit"
-           class="btn btn-primary"
-           [disabled]="templateForm.invalid || isLoading() || !uploadedFile"
-         >
+        <button type="submit" class="btn btn-primary" [disabled]="templateForm.invalid || isLoading() || !uploadedFile">
           <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
           Crear Plantilla
         </button>
@@ -310,65 +274,61 @@
 <!-- Editor visual -->
 <div class="modal-overlay editor-overlay" *ngIf="showEditor()">
   <div class="modal-dialog" (click)="$event.stopPropagation()" style="max-width: 1000px; width: 90vw;">
-      <div class="modal-header">
-        <h3>Editor de Plantilla</h3>
-        <div class="editor-toolbar">
-          <button class="btn btn-secondary" (click)="addNameElement()" [class.btn-selected]="hasElement('name')">
-            <i class="fas fa-user"></i>
-            Agregar Nombres
-          </button>
-          <button class="btn btn-secondary" (click)="addDateElement()" [class.btn-selected]="hasElement('date')">
-            <i class="fas fa-calendar"></i>
-            Fecha de Emisión
-          </button>
-          <button class="btn btn-secondary" (click)="addQrElement()" [class.btn-selected]="hasElement('qr')">
-            <i class="fas fa-qrcode"></i>
-            Agregar QR
-          </button>
-        </div>
-        <button class="btn-close" (click)="closePositionEditor()">
-          <i class="fas fa-times"></i>
+    <div class="modal-header">
+      <h3>Editor de Plantilla</h3>
+      <div class="editor-toolbar">
+        <button class="btn btn-secondary" (click)="addNameElement()" [class.btn-selected]="hasElement('name')">
+          <i class="fas fa-user"></i>
+          Agregar Nombres
+        </button>
+        <button class="btn btn-secondary" (click)="addDateElement()" [class.btn-selected]="hasElement('date')">
+          <i class="fas fa-calendar"></i>
+          Fecha de Emisión
+        </button>
+        <button class="btn btn-secondary" (click)="addQrElement()" [class.btn-selected]="hasElement('qr')">
+          <i class="fas fa-qrcode"></i>
+          Agregar QR
         </button>
       </div>
+      <button class="btn-close" (click)="closePositionEditor()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
 
     <div class="modal-body">
       <div class="image-size-info" *ngIf="editorCanvasSize() as cs">
         <small>
           Render: {{ cs.width }}×{{ cs.height }} px
-          | Base: {{ selectedTemplate()?.background_image_size?.width || '—' }}×{{ selectedTemplate()?.background_image_size?.height || '—' }} px
+          | Base: {{ selectedTemplate()?.background_image_size?.width || '—' }}×{{
+          selectedTemplate()?.background_image_size?.height || '—' }} px
         </small>
       </div>
       <div class="editor-canvas" *ngIf="uploadedPreviewUrl">
-        <div class="editor-layer" [style.transform]="'translate(' + backgroundOffset().x + 'px, ' + backgroundOffset().y + 'px)'">
+        <div class="editor-layer"
+          [style.transform]="'translate(' + backgroundOffset().x + 'px, ' + backgroundOffset().y + 'px)'">
           <img [src]="uploadedPreviewUrl" class="editor-background" alt="Fondo">
 
           <!-- Elementos superpuestos -->
-          <div *ngFor="let el of editorElements(); let i = index"
-               class="editor-element"
-               [class.selected]="selectedElementIndex() === i"
-               [style.top.px]="el.y"
-               [style.left.px]="el.x"
-               [style.transform]="'rotate(' + (el.rotation || 0) + 'deg)'"
-               (mousedown)="startDrag($event, i)"
-               (click)="selectElement(i)">
-            <button type="button" class="delete-element-btn" *ngIf="selectedElementIndex() === i" (click)="deleteSelectedElement()" title="Eliminar">
+          <div *ngFor="let el of editorElements(); let i = index" class="editor-element"
+            [class.selected]="selectedElementIndex() === i" [style.top.px]="el.y" [style.left.px]="el.x"
+            [style.transform]="'rotate(' + (el.rotation || 0) + 'deg)'" (mousedown)="startDrag($event, i)"
+            (click)="selectElement(i)">
+            <button type="button" class="delete-element-btn" *ngIf="selectedElementIndex() === i"
+              (click)="deleteSelectedElement()" title="Eliminar">
               <i class="fas fa-trash"></i>
             </button>
             <ng-container [ngSwitch]="el.type">
-              <div *ngSwitchCase="'name'" class="text-element"
-                   [style.fontFamily]="el.fontFamily || 'Arial'"
-                   [style.fontSize.px]="el.fontSize || 28"
-                   [style.color]="el.color || '#000'">
+              <div *ngSwitchCase="'name'" class="text-element" [style.fontFamily]="el.fontFamily || 'Arial'"
+                [style.fontSize.px]="el.fontSize || 28" [style.color]="el.color || '#000'">
                 Nombres Completos
                 <span class="hint">Posiciona y ajusta fuente/estilo</span>
               </div>
-              <div *ngSwitchCase="'date'" class="text-element"
-                   [style.fontFamily]="el.fontFamily || 'Arial'"
-                   [style.fontSize.px]="el.fontSize || 16"
-                   [style.color]="el.color || '#333'">
+              <div *ngSwitchCase="'date'" class="text-element" [style.fontFamily]="el.fontFamily || 'Arial'"
+                [style.fontSize.px]="el.fontSize || 16" [style.color]="el.color || '#333'">
                 Fecha de Emisión
               </div>
-              <div *ngSwitchCase="'qr'" class="qr-element" [style.width.px]="el.width || 120" [style.height.px]="el.height || 120">
+              <div *ngSwitchCase="'qr'" class="qr-element" [style.width.px]="el.width || 120"
+                [style.height.px]="el.height || 120">
                 <i class="fas fa-qrcode"></i>
               </div>
             </ng-container>
@@ -395,12 +355,15 @@
           </div>
           <div class="form-group">
             <label>Tamaño</label>
-            <input *ngIf="!isSelectedType('qr')" type="number" class="form-control" (input)="updateFontSize($event)" [value]="getSelected()?.fontSize || 28" min="6" max="200">
-            <input *ngIf="isSelectedType('qr')" type="number" class="form-control" (input)="updateQrSize($event)" [value]="getSelected()?.width || 120" min="20" max="1000">
+            <input *ngIf="!isSelectedType('qr')" type="number" class="form-control" (input)="updateFontSize($event)"
+              [value]="getSelected()?.fontSize || 28" min="6" max="200">
+            <input *ngIf="isSelectedType('qr')" type="number" class="form-control" (input)="updateQrSize($event)"
+              [value]="getSelected()?.width || 120" min="20" max="1000">
           </div>
           <div class="form-group">
             <label>Rotación</label>
-            <input type="number" class="form-control" (input)="updateRotation($event)" [value]="getSelected()?.rotation || 0" min="-180" max="180">
+            <input type="number" class="form-control" (input)="updateRotation($event)"
+              [value]="getSelected()?.rotation || 0" min="-180" max="180">
           </div>
         </div>
       </div>
@@ -427,26 +390,18 @@
       <div class="modal-body">
         <div class="form-group">
           <label>Nombre *</label>
-          <input
-            class="form-control"
-            type="text"
-            formControlName="name"
-            placeholder="Nombre de la plantilla"
-          >
+          <input class="form-control" type="text" formControlName="name" placeholder="Nombre de la plantilla">
           <div class="error-message" *ngIf="templateForm.get('name')?.touched && templateForm.get('name')?.errors">
             <span *ngIf="templateForm.get('name')?.errors?.['required']">El nombre es requerido</span>
-            <span *ngIf="templateForm.get('name')?.errors?.['minlength']">El nombre debe tener al menos 3 caracteres</span>
+            <span *ngIf="templateForm.get('name')?.errors?.['minlength']">El nombre debe tener al menos 3
+              caracteres</span>
           </div>
         </div>
 
         <div class="form-group">
           <label>Descripción</label>
-          <textarea
-            class="form-control"
-            formControlName="description"
-            placeholder="Descripción de la plantilla"
-            rows="3"
-          ></textarea>
+          <textarea class="form-control" formControlName="description" placeholder="Descripción de la plantilla"
+            rows="3"></textarea>
         </div>
 
         <div class="form-group">
@@ -468,34 +423,40 @@
         </div>
 
         <div class="form-group">
-          <label>Cambiar imagen de fondo (opcional)</label>
+          <label>Imagen de Fondo</label>
           <div class="file-upload-container">
-            <input id="templateFileInputEdit" class="file-input" type="file" accept="image/*" (change)="onTemplateFileSelected($event)">
-            <label for="templateFileInputEdit" class="file-upload-label">
-              <i class="fas fa-upload"></i>
-              <span>Selecciona una imagen (JPG/PNG)</span>
-            </label>
-            <div class="hint-message hint-warning" *ngIf="!uploadedPreviewUrl && !(selectedTemplate()?.file_url || selectedTemplate()?.file_path)">Sube una imagen de plantilla antes de editar</div>
-            <div class="hint-message hint-success" *ngIf="uploadedPreviewUrl || selectedTemplate()?.file_url || selectedTemplate()?.file_path">Posiciona tus componentes dentro de la imagen</div>
+            <!-- Input de subida (solo visible si no hay imagen) -->
+            <div *ngIf="!uploadedPreviewUrl">
+              <input id="templateFileInputEdit" class="file-input" type="file" accept="image/*"
+                (change)="onTemplateFileSelected($event)">
+              <label for="templateFileInputEdit" class="file-upload-label">
+                <i class="fas fa-upload"></i>
+                <span>Selecciona una imagen (JPG/PNG)</span>
+              </label>
+              <small class="text-muted">Sube una nueva imagen para reemplazar la actual.</small>
+            </div>
+
+            <!-- Mensajes de ayuda -->
+            <div class="hint-message hint-warning" *ngIf="!uploadedPreviewUrl">Sube una imagen de plantilla para
+              editar</div>
+            <div class="hint-message hint-success" *ngIf="uploadedPreviewUrl">Posiciona tus componentes dentro de la
+              imagen</div>
+
+            <!-- Vista previa (imagen actual o nueva) -->
             <div class="image-preview-container" *ngIf="uploadedPreviewUrl">
               <img [src]="uploadedPreviewUrl" alt="Vista previa" class="template-preview-image">
-              <button type="button" class="btn-remove-image" (click)="removeSelectedImage()" title="Quitar imagen">×</button>
+              <button type="button" class="btn-remove-image" (click)="removeSelectedImage()" title="Cambiar imagen">
+                <i class="fas fa-sync-alt"></i>
+              </button>
             </div>
-            <div class="position-editor-section" *ngIf="uploadedPreviewUrl || selectedTemplate()?.file_url || selectedTemplate()?.file_path">
+
+            <!-- Botón del editor -->
+            <div class="position-editor-section" *ngIf="uploadedPreviewUrl">
               <button type="button" class="btn btn-secondary btn-position-editor" (click)="openPositionEditor()">
                 <i class="fas fa-pencil-ruler"></i>
                 Abrir editor de posiciones
               </button>
             </div>
-            <small class="text-muted">Si no subes una nueva imagen, se conservará la actual.</small>
-          </div>
-        </div>
-
-        <!-- Vista previa del fondo actual -->
-        <div class="form-group" *ngIf="(selectedTemplate()?.file_url || selectedTemplate()?.file_path) && !uploadedPreviewUrl">
-          <label>Fondo actual</label>
-          <div class="image-preview-container">
-            <img [src]="selectedTemplate()?.file_url || selectedTemplate()?.file_path" alt="Fondo actual" class="template-preview-image">
           </div>
         </div>
       </div>
@@ -504,11 +465,7 @@
         <button type="button" class="btn btn-secondary" (click)="closeModals()">
           Cancelar
         </button>
-        <button
-          type="submit"
-          class="btn btn-primary"
-          [disabled]="templateForm.invalid || isLoading()"
-        >
+        <button type="submit" class="btn btn-primary" [disabled]="templateForm.invalid || isLoading()">
           <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
           Actualizar Plantilla
         </button>
@@ -539,12 +496,7 @@
       <button type="button" class="btn btn-secondary" (click)="closeModals()">
         Cancelar
       </button>
-      <button
-        type="button"
-        class="btn btn-danger"
-        (click)="deleteTemplate()"
-        [disabled]="isLoading()"
-      >
+      <button type="button" class="btn btn-danger" (click)="deleteTemplate()" [disabled]="isLoading()">
         <i class="fas fa-spinner fa-spin" *ngIf="isLoading()"></i>
         Eliminar
       </button>
@@ -575,7 +527,8 @@
             <h3>{{ selectedTemplate()?.name }}</h3>
             <div class="template-meta">
               <span class="badge" [class]="getStatusBadgeClass(selectedTemplate()?.status || '')">
-                <i class="fas" [class]="selectedTemplate()?.status === 'active' ? 'fa-check-circle' : 'fa-times-circle'"></i>
+                <i class="fas"
+                  [class]="selectedTemplate()?.status === 'active' ? 'fa-check-circle' : 'fa-times-circle'"></i>
                 {{ getStatusLabel(selectedTemplate()?.status || '') }}
               </span>
               <span class="type-badge" [class]="getActivityTypeBadgeClass(selectedTemplate()?.activity_type || '')">
@@ -597,7 +550,8 @@
               </div>
               <div class="detail-item">
                 <label>Fecha de Creación:</label>
-                <p><i class="fas fa-calendar-plus"></i> {{ selectedTemplate()?.created_at | date:'dd/MM/yyyy HH:mm' }}</p>
+                <p><i class="fas fa-calendar-plus"></i> {{ selectedTemplate()?.created_at | date:'dd/MM/yyyy HH:mm' }}
+                </p>
               </div>
               <div class="detail-item">
                 <label>Última Actualización:</label>
@@ -611,12 +565,8 @@
             <h4><i class="fas fa-image"></i> Vista Previa</h4>
             <div class="enhanced-preview-container">
               <div class="preview-wrapper">
-                <app-template-preview
-                  [template]="selectedTemplate()"
-                  [showElements]="true"
-                  [sampleUserName]="'Juan Pérez'"
-                  title="Vista previa de la plantilla"
-                ></app-template-preview>
+                <app-template-preview [template]="selectedTemplate()" [showElements]="true"
+                  [sampleUserName]="'Juan Pérez'" title="Vista previa de la plantilla"></app-template-preview>
                 <div class="preview-overlay">
                   <i class="fas fa-search-plus"></i>
                   <span>Click para ampliar</span>
@@ -648,11 +598,7 @@
         <i class="fas fa-times"></i>
         Cerrar
       </button>
-      <button
-        type="button"
-        class="btn btn-primary"
-        (click)="openEditModal(selectedTemplate()!)"
-      >
+      <button type="button" class="btn btn-primary" (click)="openEditModal(selectedTemplate()!)">
         <i class="fas fa-edit"></i>
         Editar Plantilla
       </button>

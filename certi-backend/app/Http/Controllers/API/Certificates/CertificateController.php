@@ -20,15 +20,25 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
 
+use App\Services\CertificateImageService;
+use App\Services\QRCodeService; // Necesario para generar el QR si no existe
+
 class CertificateController extends Controller
 {
     use ApiResponseTrait;
 
     protected $certificateService;
+    protected $imageService;
+    protected $qrService;
 
-    public function __construct(CertificateService $certificateService)
-    {
+    public function __construct(
+        CertificateService $certificateService,
+        CertificateImageService $imageService,
+        QRCodeService $qrService
+    ) {
         $this->certificateService = $certificateService;
+        $this->imageService = $imageService;
+        $this->qrService = $qrService;
     }
 
     private function resolvePdfFont(string $fontFamily, ?string $fontWeight, ?string $fontStyle): array
@@ -627,6 +637,13 @@ class CertificateController extends Controller
      * @param int $id
      * @return \Illuminate\Http\Response
      */
+    /**
+     * Descargar certificado
+     *
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\Response
+     */
     public function download(Request $request, $id)
     {
         try {
@@ -639,68 +656,72 @@ class CertificateController extends Controller
 
             $format = $request->get('format', 'pdf'); // Por defecto PDF
 
-            // Si el certificado ya tiene un documento PDF generado (Canva o local), descargarlo directamente
-            $document = CertificateDocument::where('certificate_id', $certificate->id)
-                ->where('document_type', 'pdf')
-                ->orderByDesc('uploaded_at')
-                ->first();
-            if ($document && Storage::exists($document->file_path)) {
-                $content = Storage::get($document->file_path);
-                $filename = 'certificado-' . $certificate->id . '.pdf';
-                return response($content)
-                    ->header('Content-Type', 'application/pdf')
-                    ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
-            }
+            // 1. Verificar si ya existe una imagen final generada
+            $finalImagePath = $certificate->final_image_path;
+            $finalImageAbsolute = $finalImagePath ? storage_path('app/public/' . $finalImagePath) : null;
 
-            // Fallback: usar imagen final generada si está disponible
-            if ($certificate->final_image_path && Storage::disk('public')->exists($certificate->final_image_path)) {
-                $finalImageAbsolute = storage_path('app/public/' . $certificate->final_image_path);
-                if ($format === 'pdf') {
-                    // Empaquetar la imagen final en un PDF ajustando orientación y tamaño según la imagen
-                    $imgSize = @getimagesize($finalImageAbsolute);
-                    $imgW = $imgSize ? $imgSize[0] : 2100; // px
-                    $imgH = $imgSize ? $imgSize[1] : 1480; // px
-                    $orientation = ($imgW >= $imgH) ? 'L' : 'P';
-                    $dpi = 96; // suposición razonable; si hay metadata DPI, podría leerse
-                    $widthMm = $imgW * 25.4 / $dpi;
-                    $heightMm = $imgH * 25.4 / $dpi;
-                    $pdf = new \TCPDF($orientation, 'mm', [$widthMm, $heightMm]);
-                    // Sin márgenes ni saltos para evitar borde blanco
-                    $pdf->SetMargins(0, 0, 0);
-                    $pdf->SetAutoPageBreak(false, 0);
-                    $pdf->AddPage();
-                    $pdf->Image($finalImageAbsolute, 0, 0, $widthMm, $heightMm, '', '', '', false, 300, '', false, false, 0);
-                    $filename = 'certificado-' . $certificate->id . '.pdf';
-                    return response($pdf->Output($filename, 'S'))
-                        ->header('Content-Type', 'application/pdf')
-                        ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+            // 2. Si no existe, intentamos generarla al vuelo
+            if (!$finalImageAbsolute || !file_exists($finalImageAbsolute)) {
+                Log::info('Imagen final no encontrada, generando al vuelo...', ['certificate_id' => $certificate->id]);
+                
+                // Necesitamos el QR
+                $verificationUrl = url("/verify/{$certificate->unique_code}");
+                $qrRelativePath = $this->qrService->generateQRCodeFromUrl($verificationUrl);
+                $qrAbsolutePath = $qrRelativePath ? storage_path('app/public/' . $qrRelativePath) : '';
+
+                // Generar imagen
+                $finalImagePath = $this->imageService->generateFinalCertificateImage($certificate, $qrAbsolutePath);
+                
+                if ($finalImagePath) {
+                    $certificate->final_image_path = $finalImagePath;
+                    $certificate->save();
+                    $finalImageAbsolute = storage_path('app/public/' . $finalImagePath);
                 } else {
-                    // Descargar la imagen final tal cual
-                    $content = file_get_contents($finalImageAbsolute);
-                    $filename = 'certificado-' . $certificate->id . '.jpg';
-                    return response($content)
-                        ->header('Content-Type', 'image/jpeg')
-                        ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+                    return $this->errorResponse('No se pudo generar la imagen del certificado', 500);
                 }
             }
 
-            // Obtener la plantilla del certificado
-            $template = $certificate->template;
-            if (!$template) {
-                return $this->errorResponse('Plantilla del certificado no encontrada', 404);
-            }
-
-            // Ruta del archivo de la plantilla (imagen/pdf base)
-            $templatePath = $template->file_path ? storage_path('app/' . $template->file_path) : null;
-
-            if (!$templatePath || !file_exists($templatePath)) {
-                return $this->errorResponse('Archivo de plantilla no encontrado', 404);
-            }
-
+            // 3. Servir el archivo según el formato solicitado
             if ($format === 'pdf') {
-                return $this->downloadAsPdf($certificate, $templatePath);
+                // Empaquetar la imagen final en un PDF
+                $imgSize = @getimagesize($finalImageAbsolute);
+                $imgW = $imgSize ? $imgSize[0] : 2100; // px
+                $imgH = $imgSize ? $imgSize[1] : 1480; // px
+                
+                // Calcular dimensiones en mm (asumiendo 96 DPI para pantalla, pero TCPDF usa 72pt/inch por defecto, ajustamos)
+                // TCPDF constructor: $format (page format)
+                // Convertir px a mm: (px / dpi) * 25.4
+                $dpi = 96; 
+                $widthMm = ($imgW * 25.4) / $dpi;
+                $heightMm = ($imgH * 25.4) / $dpi;
+                
+                $orientation = ($widthMm >= $heightMm) ? 'L' : 'P';
+
+                $pdf = new \TCPDF($orientation, 'mm', [$widthMm, $heightMm]);
+                $pdf->SetMargins(0, 0, 0);
+                $pdf->SetAutoPageBreak(false, 0);
+                $pdf->setPrintHeader(false);
+                $pdf->setPrintFooter(false);
+                $pdf->AddPage();
+                
+                // Insertar imagen ajustada a la página
+                $pdf->Image($finalImageAbsolute, 0, 0, $widthMm, $heightMm, '', '', '', false, 300, '', false, false, 0);
+                
+                $filename = 'certificado-' . $certificate->unique_code . '.pdf';
+                return response($pdf->Output($filename, 'S'))
+                    ->header('Content-Type', 'application/pdf')
+                    ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+
             } else {
-                return $this->downloadAsImage($certificate, $templatePath);
+                // Descargar imagen directa (JPG/PNG)
+                $content = file_get_contents($finalImageAbsolute);
+                $mime = mime_content_type($finalImageAbsolute);
+                $ext = pathinfo($finalImageAbsolute, PATHINFO_EXTENSION);
+                $filename = 'certificado-' . $certificate->unique_code . '.' . $ext;
+                
+                return response($content)
+                    ->header('Content-Type', $mime)
+                    ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
             }
 
         } catch (\Exception $e) {
@@ -709,216 +730,6 @@ class CertificateController extends Controller
         }
     }
 
-    /**
-     * Descargar certificado como PDF
-     */
-    private function downloadAsPdf($certificate, $templatePath)
-    {
-        // Crear PDF ajustando orientación y tamaño al de la imagen (plantilla o imagen final)
-        $imgSize = @getimagesize($templatePath);
-        $imgW = $imgSize ? $imgSize[0] : 2100; // px
-        $imgH = $imgSize ? $imgSize[1] : 2970; // px
-        $orientation = ($imgW >= $imgH) ? 'L' : 'P';
-        $dpi = 96; // suposición razonable
-        $widthMm = $imgW * 25.4 / $dpi;
-        $heightMm = $imgH * 25.4 / $dpi;
-
-        $pdf = new \TCPDF($orientation, 'mm', [$widthMm, $heightMm]);
-        // Eliminar márgenes y saltos automáticos para evitar borde blanco
-        $pdf->SetMargins(0, 0, 0);
-        $pdf->SetAutoPageBreak(false, 0);
-        $pdf->AddPage();
-
-        // Agregar la imagen de fondo a tamaño completo de página
-        $pdf->Image($templatePath, 0, 0, $widthMm, $heightMm, '', '', '', false, 300, '', false, false, 0);
-
-        // Overlays desde plantilla si existen (nombre del usuario, fecha, QR), escalados
-        $template = $certificate->template;
-        if ($template) {
-            $editorCanvas = is_array($template->template_styles ?? null) ? ($template->template_styles['editor_canvas_size'] ?? null) : null;
-            $bgSize = is_array($template->background_image_size ?? null) ? $template->background_image_size : null;
-            $bgW = (int)($bgSize['width'] ?? 0);
-            $bgH = (int)($bgSize['height'] ?? 0);
-            $editorW = (int)($editorCanvas['width'] ?? 0);
-            $editorH = (int)($editorCanvas['height'] ?? 0);
-            $baseW = $editorW ?: ($bgW ?: $imgW);
-            $baseH = $editorH ?: ($bgH ?: $imgH);
-            $scaleX = $baseW > 0 ? ($imgW / $baseW) : 1.0;
-            $scaleY = $baseH > 0 ? ($imgH / $baseH) : 1.0;
-            $offsetX = (int)($template->template_styles['background_offset']['x'] ?? 0);
-            $offsetY = (int)($template->template_styles['background_offset']['y'] ?? 0);
-            $oxMm = ($baseW > 0) ? (($offsetX / $baseW) * $widthMm) : 0;
-            $oyMm = ($baseH > 0) ? (($offsetY / $baseH) * $heightMm) : 0;
-            $origin = strtolower((string)($template->template_styles['coords_origin'] ?? ''));
-            $isCenter = $origin === 'center';
-            $centerX = $baseW / 2.0;
-            $centerY = $baseH / 2.0;
-            Log::info('PDF overlay contexto', [
-                'certificate_id' => $certificate->id,
-                'template_id' => $template->id ?? null,
-                'img_px' => ['w' => $imgW, 'h' => $imgH],
-                'editor_canvas' => $editorCanvas,
-                'background_image_size' => $template->background_image_size,
-                'scale' => ['x' => $scaleX, 'y' => $scaleY],
-                'background_offset_px' => ['x' => $offsetX, 'y' => $offsetY],
-                'offset_mm' => ['x' => $oxMm, 'y' => $oyMm]
-            ]);
-
-            // Nombre del usuario
-            if (is_array($template->name_position)) {
-                $pos = $template->name_position;
-                $rawX = ($pos['x'] ?? 0) + ($isCenter ? $centerX : 0);
-                $rawY = ($pos['y'] ?? 0) + ($isCenter ? $centerY : 0);
-                $xMm = ($baseW > 0) ? (($rawX / $baseW) * $widthMm) - $oxMm : 0;
-                $yMm = ($baseH > 0) ? (($rawY / $baseH) * $heightMm) - $oyMm : 0;
-                $fontSizePt = max(8, (int)round(((($pos['fontSize'] ?? 28) / $baseH) * $heightMm) * 2.83465));
-                $hex = ltrim(($pos['color'] ?? '#000000'), '#');
-                $rgb = [hexdec(substr($hex,0,2)), hexdec(substr($hex,2,2)), hexdec(substr($hex,4,2))];
-                $pdf->SetTextColor($rgb[0], $rgb[1], $rgb[2]);
-                $requestedFont = (string)($pos['fontFamily'] ?? 'helvetica');
-                [$pdfFont, $style] = $this->resolvePdfFont($requestedFont, (string)($pos['fontWeight'] ?? ''), (string)($pos['fontStyle'] ?? ''));
-                $pdf->SetFont($pdfFont, $style, $fontSizePt);
-                $holderName = $certificate->user ? ($certificate->user->name ?? $certificate->nombre) : $certificate->nombre;
-                $rotation = (float)($pos['rotation'] ?? 0);
-                $align = strtolower((string)($pos['textAlign'] ?? 'center'));
-                $textWidthMm = $pdf->GetStringWidth($holderName);
-                $xMmExpected = $xMm;
-                if ($align === 'center') {
-                    $xMm = $xMm - ($textWidthMm / 2);
-                } elseif ($align === 'right') {
-                    $xMm = $xMm - $textWidthMm;
-                }
-                $deltaMm = abs($xMm - $xMmExpected);
-                if ($deltaMm > 0.5) {
-                    Log::warning('PDF desalineación respecto a plantilla (nombre)', [
-                        'expected_center_mm' => ['x' => $xMmExpected, 'y' => $yMm],
-                        'drawn_left_mm' => ['x' => $xMm, 'y' => $yMm],
-                        'delta_mm' => $deltaMm,
-                        'text_width_mm' => $textWidthMm,
-                        'align' => $align,
-                        'font_requested' => $requestedFont,
-                        'font_applied' => $pdfFont,
-                        'font_style' => $style,
-                        'font_size_pt' => $fontSizePt
-                    ]);
-                }
-                Log::info('PDF overlay nombre', [
-                    'raw_pos_px' => $pos,
-                    'computed_mm' => ['x' => $xMm, 'y' => $yMm],
-                    'font_map' => ['px' => ($pos['fontSize'] ?? 28), 'mm_height' => $heightMm, 'pt' => $fontSizePt],
-                    'color_rgb' => $rgb,
-                    'align' => $align,
-                    'rotation' => $rotation,
-                    'font_requested' => $requestedFont,
-                    'font_applied' => $pdfFont,
-                    'font_style' => $style,
-                    'text' => $holderName
-                ]);
-                if (abs($rotation) > 0.01) {
-                    $pdf->StartTransform();
-                    $pdf->Rotate($rotation, $xMm, $yMm);
-                    $pdf->Text($xMm, $yMm, $holderName);
-                    $pdf->StopTransform();
-                } else {
-                    $pdf->Text($xMm, $yMm, $holderName);
-                }
-            }
-
-            // Fecha
-            if (is_array($template->date_position)) {
-                $pos = $template->date_position;
-                $rawX = ($pos['x'] ?? 0) + ($isCenter ? $centerX : 0);
-                $rawY = ($pos['y'] ?? 0) + ($isCenter ? $centerY : 0);
-                $xMm = ($baseW > 0) ? (($rawX / $baseW) * $widthMm) - $oxMm : 0;
-                $yMm = ($baseH > 0) ? (($rawY / $baseH) * $heightMm) - $oyMm : 0;
-                $fontSizePt = max(8, (int)round(((($pos['fontSize'] ?? 16) / $baseH) * $heightMm) * 2.83465));
-                $hex = ltrim(($pos['color'] ?? '#333333'), '#');
-                $rgb = [hexdec(substr($hex,0,2)), hexdec(substr($hex,2,2)), hexdec(substr($hex,4,2))];
-                $pdf->SetTextColor($rgb[0], $rgb[1], $rgb[2]);
-                $requestedFont = (string)($pos['fontFamily'] ?? 'helvetica');
-                [$pdfFont, $style] = $this->resolvePdfFont($requestedFont, (string)($pos['fontWeight'] ?? ''), (string)($pos['fontStyle'] ?? ''));
-                $pdf->SetFont($pdfFont, $style, $fontSizePt);
-                $dateText = $certificate->fecha_emision ? $certificate->fecha_emision->format('d/m/Y') : date('d/m/Y');
-                $rotation = (float)($pos['rotation'] ?? 0);
-                $align = strtolower((string)($pos['textAlign'] ?? 'center'));
-                $textWidthMm = $pdf->GetStringWidth($dateText);
-                $xMmExpected = $xMm;
-                if ($align === 'center') {
-                    $xMm = $xMm - ($textWidthMm / 2);
-                } elseif ($align === 'right') {
-                    $xMm = $xMm - $textWidthMm;
-                }
-                $deltaMm = abs($xMm - $xMmExpected);
-                if ($deltaMm > 0.5) {
-                    Log::warning('PDF desalineación respecto a plantilla (fecha)', [
-                        'expected_center_mm' => ['x' => $xMmExpected, 'y' => $yMm],
-                        'drawn_left_mm' => ['x' => $xMm, 'y' => $yMm],
-                        'delta_mm' => $deltaMm,
-                        'text_width_mm' => $textWidthMm,
-                        'align' => $align,
-                        'font_requested' => $requestedFont,
-                        'font_applied' => $pdfFont,
-                        'font_style' => $style,
-                        'font_size_pt' => $fontSizePt
-                    ]);
-                }
-                Log::info('PDF overlay fecha', [
-                    'raw_pos_px' => $pos,
-                    'computed_mm' => ['x' => $xMm, 'y' => $yMm],
-                    'font_map' => ['px' => ($pos['fontSize'] ?? 16), 'mm_height' => $heightMm, 'pt' => $fontSizePt],
-                    'color_rgb' => $rgb,
-                    'align' => $align,
-                    'rotation' => $rotation,
-                    'font_requested' => $requestedFont,
-                    'font_applied' => $pdfFont,
-                    'font_style' => $style,
-                    'text' => $dateText
-                ]);
-                if (abs($rotation) > 0.01) {
-                    $pdf->StartTransform();
-                    $pdf->Rotate($rotation, $xMm, $yMm);
-                    $pdf->Text($xMm, $yMm, $dateText);
-                    $pdf->StopTransform();
-                } else {
-                    $pdf->Text($xMm, $yMm, $dateText);
-                }
-            }
-
-            // QR (generado por TCPDF si falla imagen)
-            if (is_array($template->qr_position)) {
-                $pos = $template->qr_position;
-                $rawX = ($pos['x'] ?? 0) + ($isCenter ? $centerX : 0);
-                $rawY = ($pos['y'] ?? 0) + ($isCenter ? $centerY : 0);
-                $xMm = ($baseW > 0) ? (($rawX / $baseW) * $widthMm) - $oxMm : 0;
-                $yMm = ($baseH > 0) ? (($rawY / $baseH) * $heightMm) - $oyMm : 0;
-                $wMm = max(25, ($baseW > 0 ? ((($pos['width'] ?? 120) / $baseW) * $widthMm) : 0));
-                $hMm = $wMm; // preservar cuadrado
-                $rotation = (float)($pos['rotation'] ?? 0);
-                $style = [ 'border' => 0, 'padding' => 0, 'fgcolor' => [0,0,0], 'bgcolor' => false ];
-                $verificationUrl = $certificate->verification_url ?: (config('app.url') . '/verify/' . ($certificate->verification_code ?? ''));
-                Log::info('PDF overlay QR', [
-                    'raw_pos_px' => $pos,
-                    'computed_mm' => ['x' => $xMm, 'y' => $yMm, 'w' => $wMm, 'h' => $hMm],
-                    'url' => $verificationUrl
-                ]);
-                if (abs($rotation) > 0.01) {
-                    $pdf->StartTransform();
-                    // Rotar alrededor del centro del bloque QR
-                    $pdf->Rotate($rotation, $xMm + ($wMm / 2), $yMm + ($hMm / 2));
-                    $pdf->write2DBarcode($verificationUrl, 'QRCODE,H', $xMm, $yMm, $wMm, $hMm, $style, 'N');
-                    $pdf->StopTransform();
-                } else {
-                    $pdf->write2DBarcode($verificationUrl, 'QRCODE,H', $xMm, $yMm, $wMm, $hMm, $style, 'N');
-                }
-            }
-        }
-
-        $filename = 'certificado-' . $certificate->id . '.pdf';
-
-        return response($pdf->Output($filename, 'S'))
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
-    }
 
     /**
      * Enviar certificado por correo electrónico
@@ -942,121 +753,53 @@ class CertificateController extends Controller
             $certName = $certificate->nombre ?: ('Certificado #' . $certificate->id);
             $activityName = $certificate->activity ? ($certificate->activity->name ?? '') : '';
 
-            // Generar bytes del PDF
-            $pdfBytes = null;
-            $filename = 'certificado-' . $certificate->id . '.pdf';
+            // 1. Verificar si ya existe una imagen final generada
+            $finalImagePath = $certificate->final_image_path;
+            $finalImageAbsolute = $finalImagePath ? storage_path('app/public/' . $finalImagePath) : null;
 
-            // Priorizar imagen final si existe
-            if ($certificate->final_image_path && Storage::disk('public')->exists($certificate->final_image_path)) {
-                $finalImageAbsolute = storage_path('app/public/' . $certificate->final_image_path);
-                $imgSize = @getimagesize($finalImageAbsolute);
-                $imgW = $imgSize ? $imgSize[0] : 2100;
-                $imgH = $imgSize ? $imgSize[1] : 1480;
-                $orientation = ($imgW >= $imgH) ? 'L' : 'P';
-                $dpi = 96;
-                $widthMm = $imgW * 25.4 / $dpi;
-                $heightMm = $imgH * 25.4 / $dpi;
-                $pdf = new \TCPDF($orientation, 'mm', [$widthMm, $heightMm]);
-                $pdf->SetMargins(0, 0, 0);
-                $pdf->SetAutoPageBreak(false, 0);
-                $pdf->AddPage();
-                $pdf->Image($finalImageAbsolute, 0, 0, $widthMm, $heightMm, '', '', '', false, 300, '', false, false, 0);
-                $pdfBytes = $pdf->Output($filename, 'S');
-            } else {
-                // Usar plantilla con overlays
-                $template = $certificate->template;
-                $templatePath = $template && $template->file_path ? storage_path('app/' . $template->file_path) : null;
-                if (!$templatePath || !file_exists($templatePath)) {
-                    return $this->errorResponse('Archivo de plantilla no encontrado para generar PDF', 404);
+            // 2. Si no existe, intentamos generarla al vuelo
+            if (!$finalImageAbsolute || !file_exists($finalImageAbsolute)) {
+                Log::info('Imagen final no encontrada para email, generando al vuelo...', ['certificate_id' => $certificate->id]);
+                
+                // Necesitamos el QR
+                $verificationUrl = url("/verify/{$certificate->unique_code}");
+                $qrRelativePath = $this->qrService->generateQRCodeFromUrl($verificationUrl);
+                $qrAbsolutePath = $qrRelativePath ? storage_path('app/public/' . $qrRelativePath) : '';
+
+                // Generar imagen
+                $finalImagePath = $this->imageService->generateFinalCertificateImage($certificate, $qrAbsolutePath);
+                
+                if ($finalImagePath) {
+                    $certificate->final_image_path = $finalImagePath;
+                    $certificate->save();
+                    $finalImageAbsolute = storage_path('app/public/' . $finalImagePath);
+                } else {
+                    Log::error('No se pudo generar la imagen del certificado para email', ['certificate_id' => $certificate->id]);
+                    // Podríamos fallar o intentar enviar sin adjunto, pero mejor fallar para evitar correos rotos
+                    return $this->errorResponse('Error al generar el certificado para el envío', 500);
                 }
-                $imgSize = @getimagesize($templatePath);
-                $imgW = $imgSize ? $imgSize[0] : 2100;
-                $imgH = $imgSize ? $imgSize[1] : 2970;
-                $orientation = ($imgW >= $imgH) ? 'L' : 'P';
-                $dpi = 96;
-                $widthMm = $imgW * 25.4 / $dpi;
-                $heightMm = $imgH * 25.4 / $dpi;
-                $pdf = new \TCPDF($orientation, 'mm', [$widthMm, $heightMm]);
-                $pdf->SetMargins(0, 0, 0);
-                $pdf->SetAutoPageBreak(false, 0);
-                $pdf->AddPage();
-                $pdf->Image($templatePath, 0, 0, $widthMm, $heightMm, '', '', '', false, 300, '', false, false, 0);
-
-                // Overlays
-                if ($template) {
-                    $editorCanvas = is_array($template->template_styles ?? null) ? ($template->template_styles['editor_canvas_size'] ?? null) : null;
-                    $bgSize = is_array($template->background_image_size ?? null) ? $template->background_image_size : null;
-                    $bgW = (int)($bgSize['width'] ?? 0);
-                    $bgH = (int)($bgSize['height'] ?? 0);
-                    $editorW = (int)($editorCanvas['width'] ?? 0);
-                    $editorH = (int)($editorCanvas['height'] ?? 0);
-                    $baseW = $editorW ?: ($bgW ?: $imgW);
-                    $baseH = $editorH ?: ($bgH ?: $imgH);
-                    $scaleX = $baseW > 0 ? ($imgW / $baseW) : 1.0;
-                    $scaleY = $baseH > 0 ? ($imgH / $baseH) : 1.0;
-                    $offsetX = (int)($template->template_styles['background_offset']['x'] ?? 0);
-                    $offsetY = (int)($template->template_styles['background_offset']['y'] ?? 0);
-                    $oxMm = ($baseW > 0) ? (($offsetX / $baseW) * $widthMm) : 0;
-                    $oyMm = ($baseH > 0) ? (($offsetY / $baseH) * $heightMm) : 0;
-                    $origin = strtolower((string)($template->template_styles['coords_origin'] ?? ''));
-                    $isCenter = $origin === 'center';
-                    $centerX = $baseW / 2.0;
-                    $centerY = $baseH / 2.0;
-
-                    // Nombre
-                    if (is_array($template->name_position)) {
-                        $pos = $template->name_position;
-                        $rawX = ($pos['x'] ?? 0) + ($isCenter ? $centerX : 0);
-                        $rawY = ($pos['y'] ?? 0) + ($isCenter ? $centerY : 0);
-                        $xMm = ($baseW > 0) ? (($rawX / $baseW) * $widthMm) - $oxMm : 0;
-                        $yMm = ($baseH > 0) ? (($rawY / $baseH) * $heightMm) - $oyMm : 0;
-                        $fontSizePt = max(8, (int)round(((($pos['fontSize'] ?? 28) / $baseH) * $heightMm) * 2.83465));
-                        $hex = ltrim(($pos['color'] ?? '#000000'), '#');
-                        $rgb = [hexdec(substr($hex,0,2)), hexdec(substr($hex,2,2)), hexdec(substr($hex,4,2))];
-                        $pdf->SetTextColor($rgb[0], $rgb[1], $rgb[2]);
-                        $requestedFont = (string)($pos['fontFamily'] ?? 'helvetica');
-                        [$pdfFont, $style] = $this->resolvePdfFont($requestedFont, (string)($pos['fontWeight'] ?? ''), (string)($pos['fontStyle'] ?? ''));
-                        $pdf->SetFont($pdfFont, $style, $fontSizePt);
-                        $holderName = $certificate->user ? ($certificate->user->name ?? $certificate->nombre) : $certificate->nombre;
-                        $rotation = (float)($pos['rotation'] ?? 0);
-                        $pdf->Text($xMm, $yMm, $holderName);
-                    }
-
-                    // Fecha
-                    if (is_array($template->date_position)) {
-                        $pos = $template->date_position;
-                        $rawX = ($pos['x'] ?? 0) + ($isCenter ? $centerX : 0);
-                        $rawY = ($pos['y'] ?? 0) + ($isCenter ? $centerY : 0);
-                        $xMm = ($baseW > 0) ? (($rawX / $baseW) * $widthMm) - $oxMm : 0;
-                        $yMm = ($baseH > 0) ? (($rawY / $baseH) * $heightMm) - $oyMm : 0;
-                        $fontSizePt = max(8, (int)round(((($pos['fontSize'] ?? 16) / $baseH) * $heightMm) * 2.83465));
-                        $hex = ltrim(($pos['color'] ?? '#333333'), '#');
-                        $rgb = [hexdec(substr($hex,0,2)), hexdec(substr($hex,2,2)), hexdec(substr($hex,4,2))];
-                        $pdf->SetTextColor($rgb[0], $rgb[1], $rgb[2]);
-                        $requestedFont = (string)($pos['fontFamily'] ?? 'helvetica');
-                        [$pdfFont, $style] = $this->resolvePdfFont($requestedFont, (string)($pos['fontWeight'] ?? ''), (string)($pos['fontStyle'] ?? ''));
-                        $pdf->SetFont($pdfFont, $style, $fontSizePt);
-                        $dateText = $certificate->fecha_emision ? $certificate->fecha_emision->format('d/m/Y') : date('d/m/Y');
-                        $pdf->Text($xMm, $yMm, $dateText);
-                    }
-
-                    // QR
-                    if (is_array($template->qr_position)) {
-                        $pos = $template->qr_position;
-                        $rawX = ($pos['x'] ?? 0) + ($isCenter ? $centerX : 0);
-                        $rawY = ($pos['y'] ?? 0) + ($isCenter ? $centerY : 0);
-                        $xMm = ($baseW > 0) ? (($rawX / $baseW) * $widthMm) - $oxMm : 0;
-                        $yMm = ($baseH > 0) ? (($rawY / $baseH) * $heightMm) - $oyMm : 0;
-                        $wMm = max(25, ($baseW > 0 ? ((($pos['width'] ?? 120) / $baseW) * $widthMm) : 0));
-                        $hMm = $wMm;
-                        $verificationUrl = $certificate->verification_url ?: (config('app.url') . '/verify/' . ($certificate->verification_code ?? ''));
-                        $style = [ 'border' => 0, 'padding' => 0, 'fgcolor' => [0,0,0], 'bgcolor' => false ];
-                        $pdf->write2DBarcode($verificationUrl, 'QRCODE,H', $xMm, $yMm, $wMm, $hMm, $style, 'N');
-                    }
-                }
-
-                $pdfBytes = $pdf->Output($filename, 'S');
             }
+
+            // 3. Generar PDF envolviendo la imagen
+            $imgSize = @getimagesize($finalImageAbsolute);
+            $imgW = $imgSize ? $imgSize[0] : 2100;
+            $imgH = $imgSize ? $imgSize[1] : 1480;
+            
+            $dpi = 96;
+            $widthMm = ($imgW * 25.4) / $dpi;
+            $heightMm = ($imgH * 25.4) / $dpi;
+            $orientation = ($widthMm >= $heightMm) ? 'L' : 'P';
+
+            $pdf = new \TCPDF($orientation, 'mm', [$widthMm, $heightMm]);
+            $pdf->SetMargins(0, 0, 0);
+            $pdf->SetAutoPageBreak(false, 0);
+            $pdf->setPrintHeader(false);
+            $pdf->setPrintFooter(false);
+            $pdf->AddPage();
+            $pdf->Image($finalImageAbsolute, 0, 0, $widthMm, $heightMm, '', '', '', false, 300, '', false, false, 0);
+            
+            $filename = 'certificado-' . $certificate->unique_code . '.pdf';
+            $pdfBytes = $pdf->Output($filename, 'S');
 
             // HTML del mensaje (simple y con estilos inline)
             $subject = 'Tu certificado: ' . $certName;
@@ -1101,33 +844,7 @@ class CertificateController extends Controller
         }
     }
 
-    /**
-     * Descargar certificado como imagen
-     */
-    private function downloadAsImage($certificate, $templatePath)
-    {
-        // Crear una copia de la imagen base
-        $image = imagecreatefromstring(file_get_contents($templatePath));
 
-        if (!$image) {
-            return $this->errorResponse('Error al procesar la imagen', 500);
-        }
-
-        // La imagen final generada contiene overlays; si no existe aún, devolvemos la imagen base sin textos de fallback
-
-        $filename = 'certificado-' . $certificate->id . '.jpg';
-
-        ob_start();
-        imagejpeg($image, null, 90);
-        $imageData = ob_get_contents();
-        ob_end_clean();
-
-        imagedestroy($image);
-
-        return response($imageData)
-            ->header('Content-Type', 'image/jpeg')
-            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
-    }
 
     /**
      * Obtener vista previa del certificado

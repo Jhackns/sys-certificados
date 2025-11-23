@@ -101,13 +101,13 @@ export class PositionEditorComponent implements OnInit, OnDestroy, AfterViewInit
           const containerElement = this.canvasElement.nativeElement.parentElement;
           const containerWidth = containerElement?.clientWidth || window.innerWidth * 0.8;
           const containerHeight = containerElement?.clientHeight || window.innerHeight * 0.7;
-          
+
           // Calcular el tamaño máximo disponible (dejando padding)
           const maxWidth = Math.min(containerWidth - 48, 1400); // 48px de padding total
           const maxHeight = Math.min(containerHeight - 48, 1000);
-          
+
           const imageAspectRatio = tempImg.width! / tempImg.height!;
-          
+
           // Calcular dimensiones del canvas para mostrar la imagen lo más grande posible
           if (imageAspectRatio > maxWidth / maxHeight) {
             // La imagen es más ancha proporcionalmente
@@ -118,7 +118,7 @@ export class PositionEditorComponent implements OnInit, OnDestroy, AfterViewInit
             canvasHeight = maxHeight;
             canvasWidth = canvasHeight * imageAspectRatio;
           }
-          
+
           // Asegurar dimensiones mínimas razonables
           canvasWidth = Math.max(400, canvasWidth);
           canvasHeight = Math.max(300, canvasHeight);
@@ -183,7 +183,7 @@ export class PositionEditorComponent implements OnInit, OnDestroy, AfterViewInit
   private async loadBackgroundImage(): Promise<void> {
     try {
       // Usar la sintaxis correcta de Fabric.js v6 con Promise
-       const img = await FabricImage.fromURL(this.imageUrl, {}, {});
+      const img = await FabricImage.fromURL(this.imageUrl, {}, {});
 
       if (img && img.getElement()) {
         // Las dimensiones originales ya se guardaron en initializeCanvas
@@ -392,7 +392,15 @@ export class PositionEditorComponent implements OnInit, OnDestroy, AfterViewInit
       color: this.nameElement.fill
     } : null;
 
-    this.positionsChanged.emit({ qrPosition, namePosition });
+    const templateStyles = {
+      editor_canvas_size: {
+        width: this.canvas ? this.canvas.getWidth() : 800,
+        height: this.canvas ? this.canvas.getHeight() : 600
+      },
+      coords_origin: 'left-top'
+    };
+
+    this.positionsChanged.emit({ qrPosition, namePosition, templateStyles } as any);
   }
 
   savePositions(): void {
@@ -432,7 +440,14 @@ export class PositionEditorComponent implements OnInit, OnDestroy, AfterViewInit
     const positionsData = {
       qr_position: qrPosition,
       name_position: namePosition,
-      background_image_size: backgroundImageSize
+      background_image_size: backgroundImageSize,
+      template_styles: {
+        editor_canvas_size: {
+          width: this.canvas.getWidth(),
+          height: this.canvas.getHeight()
+        },
+        coords_origin: 'left-top' // Explicitly state origin
+      }
     };
 
     this.templateService.updateTemplatePositions(this.templateId, positionsData).subscribe({

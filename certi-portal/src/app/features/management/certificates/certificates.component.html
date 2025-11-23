@@ -27,12 +27,7 @@
     <form [formGroup]="filterForm" (ngSubmit)="applyFilters()" class="filters-form">
       <div class="search-box">
         <i class="fas fa-search"></i>
-        <input
-          type="text"
-          class="form-control"
-          placeholder="Buscar por nombre o código..."
-          formControlName="search"
-        >
+        <input type="text" class="form-control" placeholder="Buscar por nombre o código..." formControlName="search">
       </div>
 
       <div class="filter-group">
@@ -50,7 +45,8 @@
         </select>
 
         <input class="form-control" type="date" placeholder="Fecha emisión desde" formControlName="fecha_emision">
-        <input class="form-control" type="date" placeholder="Fecha vencimiento hasta" formControlName="fecha_vencimiento">
+        <input class="form-control" type="date" placeholder="Fecha vencimiento hasta"
+          formControlName="fecha_vencimiento">
 
         <div class="filter-actions">
           <button type="submit" class="btn btn-primary">
@@ -122,39 +118,19 @@
           </td>
           <td>
             <div class="action-buttons">
-              <button
-                class="btn-icon btn-view"
-                (click)="openViewModal(certificate)"
-                title="Ver detalles"
-              >
+              <button class="btn-icon btn-view" (click)="openViewModal(certificate)" title="Ver detalles">
                 <i class="fas fa-eye"></i>
               </button>
-              <button
-                class="btn-icon btn-download"
-                (click)="openDownloadModal(certificate)"
-                title="Descargar"
-              >
+              <button class="btn-icon btn-download" (click)="openDownloadModal(certificate)" title="Descargar">
                 <i class="fas fa-download"></i>
               </button>
-              <button
-                class="btn-icon btn-send"
-                (click)="sendCertificateEmail(certificate.id)"
-                title="Enviar por email"
-              >
+              <button class="btn-icon btn-send" (click)="sendCertificateEmail(certificate.id)" title="Enviar por email">
                 <i class="fas fa-envelope"></i>
               </button>
-              <button
-                class="btn-icon btn-edit"
-                (click)="openEditModal(certificate)"
-                title="Editar"
-              >
+              <button class="btn-icon btn-edit" (click)="openEditModal(certificate)" title="Editar">
                 <i class="fas fa-edit"></i>
               </button>
-              <button
-                class="btn-icon btn-delete"
-                (click)="openDeleteModal(certificate)"
-                title="Eliminar"
-              >
+              <button class="btn-icon btn-delete" (click)="openDeleteModal(certificate)" title="Eliminar">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -167,11 +143,7 @@
   <!-- Paginación -->
   <div class="pagination-container" *ngIf="!isLoading() && totalPages() > 1">
     <nav class="pagination-nav">
-      <button
-        class="pagination-btn"
-        [disabled]="currentPage() === 1"
-        (click)="goToPage(currentPage() - 1)"
-      >
+      <button class="pagination-btn" [disabled]="currentPage() === 1" (click)="goToPage(currentPage() - 1)">
         <i class="fas fa-chevron-left"></i>
         Anterior
       </button>
@@ -180,11 +152,7 @@
         Página {{ currentPage() }} de {{ totalPages() }}
       </div>
 
-      <button
-        class="pagination-btn"
-        [disabled]="currentPage() === totalPages()"
-        (click)="goToPage(currentPage() + 1)"
-      >
+      <button class="pagination-btn" [disabled]="currentPage() === totalPages()" (click)="goToPage(currentPage() + 1)">
         Siguiente
         <i class="fas fa-chevron-right"></i>
       </button>
@@ -215,13 +183,9 @@
           <div class="form-grid">
             <div class="form-group full-width">
               <label>Nombre del certificado <span class="required">*</span></label>
-              <input
-                class="form-control"
-                type="text"
-                formControlName="nombre"
+              <input class="form-control" type="text" formControlName="nombre"
                 placeholder="Certificado de Participación"
-                [class.invalid]="createForm.get('nombre')?.invalid && createForm.get('nombre')?.touched"
-              />
+                [class.invalid]="createForm.get('nombre')?.invalid && createForm.get('nombre')?.touched" />
               <div class="error-message" *ngIf="createForm.get('nombre')?.invalid && createForm.get('nombre')?.touched">
                 <span *ngIf="createForm.get('nombre')?.errors?.['required']">El nombre es requerido</span>
               </div>
@@ -229,30 +193,26 @@
 
             <div class="form-group">
               <label>Usuario <span class="required">*</span></label>
-              <select
-                class="form-control"
-                formControlName="user_id"
-                [class.invalid]="createForm.get('user_id')?.invalid && createForm.get('user_id')?.touched"
-              >
+              <select class="form-control" formControlName="user_id"
+                [class.invalid]="createForm.get('user_id')?.invalid && createForm.get('user_id')?.touched">
                 <option value="">Seleccione usuario</option>
                 <option *ngFor="let user of users()" [value]="user.id">{{ user.name }} ({{ user.email }})</option>
               </select>
-              <div class="error-message" *ngIf="createForm.get('user_id')?.invalid && createForm.get('user_id')?.touched">
+              <div class="error-message"
+                *ngIf="createForm.get('user_id')?.invalid && createForm.get('user_id')?.touched">
                 <span *ngIf="createForm.get('user_id')?.errors?.['required']">El usuario es requerido</span>
               </div>
             </div>
 
             <div class="form-group">
               <label>Actividad <span class="required">*</span></label>
-              <select
-                class="form-control"
-                formControlName="activity_id"
-                [class.invalid]="createForm.get('activity_id')?.invalid && createForm.get('activity_id')?.touched"
-              >
+              <select class="form-control" formControlName="activity_id"
+                [class.invalid]="createForm.get('activity_id')?.invalid && createForm.get('activity_id')?.touched">
                 <option value="">Seleccione actividad</option>
                 <option *ngFor="let activity of activities()" [value]="activity.id">{{ activity.name }}</option>
               </select>
-              <div class="error-message" *ngIf="createForm.get('activity_id')?.invalid && createForm.get('activity_id')?.touched">
+              <div class="error-message"
+                *ngIf="createForm.get('activity_id')?.invalid && createForm.get('activity_id')?.touched">
                 <span *ngIf="createForm.get('activity_id')?.errors?.['required']">La actividad es requerida</span>
               </div>
             </div>
@@ -267,29 +227,24 @@
           <div class="form-grid">
             <div class="form-group">
               <label>Plantilla <span class="required">*</span></label>
-              <select
-                class="form-control"
-                formControlName="id_template"
+              <select class="form-control" formControlName="id_template"
                 (change)="onTemplateChange($any($event.target).value)"
-                [class.invalid]="createForm.get('id_template')?.invalid && createForm.get('id_template')?.touched"
-              >
+                [class.invalid]="createForm.get('id_template')?.invalid && createForm.get('id_template')?.touched">
                 <option value="">Seleccione plantilla</option>
                 <option *ngFor="let template of templates()" [value]="template.id">{{ template.name }}</option>
               </select>
               <!-- Badge de estado inline y mensaje ligero de autocompletado -->
               <div class="field-inline-meta">
-                <span
-                  *ngIf="selectedTemplate()"
-                  class="badge"
+                <span *ngIf="selectedTemplate()" class="badge"
                   [class]="getStatusBadgeClass(selectedTemplate()?.status || '')"
-                  title="Estado de la plantilla seleccionada"
-                >
+                  title="Estado de la plantilla seleccionada">
                   {{ getStatusLabel(selectedTemplate()?.status) }}
                 </span>
                 <small class="inline-info" *ngIf="templateLoading()">Cargando datos de la plantilla...</small>
                 <!-- Mensaje de autocompletado y elementos de Canva removidos -->
               </div>
-              <div class="error-message" *ngIf="createForm.get('id_template')?.invalid && createForm.get('id_template')?.touched">
+              <div class="error-message"
+                *ngIf="createForm.get('id_template')?.invalid && createForm.get('id_template')?.touched">
                 <span *ngIf="createForm.get('id_template')?.errors?.['required']">La plantilla es requerida</span>
               </div>
             </div>
@@ -306,21 +261,12 @@
 
             <div class="form-group">
               <label>Fecha de Emisión</label>
-              <input
-                class="form-control"
-                type="date"
-                formControlName="fecha_emision"
-                [value]="todayDate"
-              />
+              <input class="form-control" type="date" formControlName="fecha_emision" [value]="todayDate" />
             </div>
 
             <div class="form-group">
               <label>Fecha de Vencimiento (Opcional)</label>
-              <input
-                class="form-control"
-                type="date"
-                formControlName="fecha_vencimiento"
-              />
+              <input class="form-control" type="date" formControlName="fecha_vencimiento" />
             </div>
           </div>
         </div>
@@ -332,14 +278,10 @@
           </div>
           <div class="form-group">
             <label>Descripción del certificado</label>
-            <textarea
-              class="form-control"
-              formControlName="descripcion"
-              maxlength="2000"
-              rows="3"
-              placeholder="Descripción detallada del certificado..."
-            ></textarea>
-            <small class="char-counter" [class.limit]="createForm.get('descripcion')?.value?.length >= 2000">{{ createForm.get('descripcion')?.value?.length }}/2000</small>
+            <textarea class="form-control" formControlName="descripcion" maxlength="2000" rows="3"
+              placeholder="Descripción detallada del certificado..."></textarea>
+            <small class="char-counter" [class.limit]="createForm.get('descripcion')?.value?.length >= 2000">{{
+              createForm.get('descripcion')?.value?.length }}/2000</small>
           </div>
         </div>
 
@@ -349,13 +291,8 @@
             <h5><i class="fas fa-image"></i> Vista previa de la plantilla</h5>
           </div>
           <div class="template-preview-content">
-            <app-template-preview
-              [template]="selectedTemplate()"
-              [maxWidth]="600"
-              [maxHeight]="400"
-              [showElements]="true"
-              [sampleUserName]="getUserNameForPreview()"
-            ></app-template-preview>
+            <app-template-preview [template]="selectedTemplate()" [maxWidth]="600" [maxHeight]="400"
+              [showElements]="true" [sampleUserName]="getUserNameForPreview()"></app-template-preview>
           </div>
         </div>
       </div>
@@ -537,45 +474,60 @@
       <!-- Vista previa del certificado -->
       <div class="certificate-preview-section">
         <h4><i class="fas fa-file-pdf"></i> Vista Previa del Certificado</h4>
-          <div class="certificate-preview-container">
+        <div class="certificate-preview-container">
+          <!-- 1. Si existe la imagen generada (fusionada), mostrarla -->
+          <div class="certificate-preview" *ngIf="certificatePreview(); else templateSimulation">
+            <img [src]="certificatePreview()" [alt]="'Certificado de ' + selectedCertificate()?.user?.name"
+              class="certificate-img"
+              style="width: 100%; height: auto; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 4px;" />
+            <div class="mt-2 text-center">
+              <small class="text-success"><i class="fas fa-check-circle"></i> Visualizando certificado generado (Imagen
+                Final)</small>
+            </div>
+          </div>
+
+          <!-- 2. Si no, mostrar simulación con plantilla (capas HTML) -->
+          <ng-template #templateSimulation>
             <div class="certificate-preview" *ngIf="selectedTemplate()?.file_url; else noCertificatePreview">
-            <app-template-preview
-              [template]="selectedTemplate()"
-              [maxWidth]="720"
-              [maxHeight]="480"
-              [showElements]="true"
-              [sampleUserName]="selectedCertificate()?.user?.name || 'Usuario'"
-              [qrUrl]="getQrPreviewUrl()"
-              [sampleDate]="formatDate(selectedCertificate()?.fecha_emision)"
-            ></app-template-preview>
-            <div class="component-coords">
-              <div class="coords-grid">
-                <div class="coords-col">
-                  <h6><i class="fas fa-crosshairs"></i> Coordenadas</h6>
-                  <div class="coord-row"><span class="label">Nombre:</span><span>x = {{ getNameCoordX() }}, y = {{ getNameCoordY() }}</span></div>
-                  <div class="coord-row"><span class="label">Fecha:</span><span>x = {{ getDateCoordX() }}, y = {{ getDateCoordY() }}</span></div>
-                  <div class="coord-row"><span class="label">QR:</span><span>x = {{ getQrCoordX() }}, y = {{ getQrCoordY() }}</span></div>
-                </div>
-                <div class="coords-col">
-                  <h6><i class="fas fa-text-height"></i> Tamaños</h6>
-                  <div class="coord-row"><span class="label">Nombre:</span><span>{{ getNameSize() }}</span></div>
-                  <div class="coord-row"><span class="label">Fecha:</span><span>{{ getDateSize() }}</span></div>
-                  <div class="coord-row"><span class="label">QR:</span><span>{{ getQrSizeValue() }}</span></div>
+              <div class="alert alert-info mb-2">
+                <i class="fas fa-info-circle"></i> Vista preliminar (simulación). El certificado final puede variar
+                ligeramente.
+              </div>
+              <app-template-preview [template]="selectedTemplate()" [maxWidth]="720" [maxHeight]="480"
+                [showElements]="true" [sampleUserName]="selectedCertificate()?.user?.name || 'Usuario'"
+                [qrUrl]="getQrPreviewUrl()"
+                [sampleDate]="formatDate(selectedCertificate()?.fecha_emision)"></app-template-preview>
+              <div class="component-coords">
+                <div class="coords-grid">
+                  <div class="coords-col">
+                    <h6><i class="fas fa-crosshairs"></i> Coordenadas</h6>
+                    <div class="coord-row"><span class="label">Nombre:</span><span>x = {{ getNameCoordX() }}, y = {{
+                        getNameCoordY() }}</span></div>
+                    <div class="coord-row"><span class="label">Fecha:</span><span>x = {{ getDateCoordX() }}, y = {{
+                        getDateCoordY() }}</span></div>
+                    <div class="coord-row"><span class="label">QR:</span><span>x = {{ getQrCoordX() }}, y = {{
+                        getQrCoordY() }}</span></div>
+                  </div>
+                  <div class="coords-col">
+                    <h6><i class="fas fa-text-height"></i> Tamaños</h6>
+                    <div class="coord-row"><span class="label">Nombre:</span><span>{{ getNameSize() }}</span></div>
+                    <div class="coord-row"><span class="label">Fecha:</span><span>{{ getDateSize() }}</span></div>
+                    <div class="coord-row"><span class="label">QR:</span><span>{{ getQrSizeValue() }}</span></div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </ng-template>
+
+          <!-- 3. Estado de carga o error -->
           <ng-template #noCertificatePreview>
             <div class="no-preview">
               <i class="fas fa-file-pdf"></i>
-              <p>Cargando vista previa del certificado...</p>
+              <p>Cargando vista previa...</p>
               <button class="btn btn-primary btn-sm" (click)="loadCertificatePreview(selectedCertificate()?.id || 0)">
                 <i class="fas fa-refresh"></i>
-                Cargar Vista Previa
+                Reintentar
               </button>
-              <div *ngIf="certificatePreview()">
-                <img [src]="certificatePreview()" [alt]="'Certificado de ' + selectedCertificate()?.user?.name" class="certificate-img" />
-              </div>
             </div>
           </ng-template>
         </div>
@@ -656,23 +608,15 @@
       </div>
 
       <div class="download-options">
-        <button
-          type="button"
-          class="btn btn-download-pdf"
-          (click)="downloadCertificateFormat('pdf')"
-          [disabled]="isLoading()"
-        >
+        <button type="button" class="btn btn-download-pdf" (click)="downloadCertificateFormat('pdf')"
+          [disabled]="isLoading()">
           <i class="fas fa-file-pdf"></i>
           <span>Descargar PDF</span>
           <small>Formato estándar para impresión</small>
         </button>
 
-        <button
-          type="button"
-          class="btn btn-download-jpg"
-          (click)="downloadCertificateFormat('jpg')"
-          [disabled]="isLoading()"
-        >
+        <button type="button" class="btn btn-download-jpg" (click)="downloadCertificateFormat('jpg')"
+          [disabled]="isLoading()">
           <i class="fas fa-file-image"></i>
           <span>Descargar JPG</span>
           <small>Formato de imagen para compartir</small>
@@ -695,4 +639,5 @@
 </div>
 
 <!-- Overlay para modales -->
-<div class="modal-backdrop fade show" *ngIf="showViewModal() || showCreateModal() || showEditModal() || showDeleteModal() || showDownloadModal()"></div>
+<div class="modal-backdrop fade show"
+  *ngIf="showViewModal() || showCreateModal() || showEditModal() || showDeleteModal() || showDownloadModal()"></div>

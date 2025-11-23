@@ -63,8 +63,101 @@ export class TemplatesComponent implements OnInit {
   selectedElementIndex = signal<number | null>(null);
   availableFonts = signal<string[]>([]);
   private fallbackFonts: string[] = [
-    'Arial','Helvetica','Times New Roman','Courier New','Verdana','Georgia','Trebuchet MS','Tahoma','Calibri','Cambria','Segoe UI','Garamond','Bookman','Palatino','Comic Sans MS'
+    'Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana', 'Georgia', 'Trebuchet MS', 'Tahoma', 'Calibri', 'Cambria', 'Segoe UI', 'Garamond', 'Bookman', 'Palatino', 'Comic Sans MS'
   ];
+
+  // Snapshot for Undo
+  private editorStateSnapshot: any = null;
+
+  private snapshotState(): void {
+    this.editorStateSnapshot = {
+      elements: JSON.parse(JSON.stringify(this.editorElements())),
+      backgroundOffset: { ...this.backgroundOffset() },
+      editorCanvasSize: this.editorCanvasSize() ? { ...this.editorCanvasSize() } : null
+    };
+  }
+
+  private restoreState(): void {
+    if (this.editorStateSnapshot) {
+      this.editorElements.set(this.editorStateSnapshot.elements);
+      this.backgroundOffset.set(this.editorStateSnapshot.backgroundOffset);
+      this.editorCanvasSize.set(this.editorStateSnapshot.editorCanvasSize);
+      this.editorStateSnapshot = null;
+    }
+  }
+
+  private loadTemplateToSignals(full: any): void {
+    this.uploadedPreviewUrl = (full?.file_url || full?.file_path || this.uploadedPreviewUrl);
+
+    const offX = Number(full?.template_styles?.background_offset?.x ?? 0);
+    const offY = Number(full?.template_styles?.background_offset?.y ?? 0);
+    this.backgroundOffset.set({ x: Math.round(offX), y: Math.round(offY) });
+
+    // Preserve editor canvas size
+    // Preserve editor canvas size
+    const canvasSz = full?.template_styles?.editor_canvas_size;
+    let savedW = 0;
+    let savedH = 0;
+    if (canvasSz && canvasSz.width && canvasSz.height) {
+      savedW = Number(canvasSz.width);
+      savedH = Number(canvasSz.height);
+      this.editorCanvasSize.set({
+        width: savedW,
+        height: savedH
+      });
+    } else {
+      this.editorCanvasSize.set(null);
+    }
+
+    // Helper to resolve absolute coordinates
+    const getAbsX = (pos: any) => {
+      if (pos.left != null) return Number(pos.left);
+      // Si solo tenemos X relativo y conocemos el ancho original, convertimos
+      if (pos.x != null && savedW > 0) return Number(pos.x) + (savedW / 2);
+      // Fallback (probablemente incorrecto si es relativo pero no hay otra opción)
+      return pos.x != null ? Number(pos.x) : null;
+    };
+
+    const getAbsY = (pos: any) => {
+      if (pos.top != null) return Number(pos.top);
+      if (pos.y != null && savedH > 0) return Number(pos.y) + (savedH / 2);
+      return pos.y != null ? Number(pos.y) : null;
+    };
+
+    const els: { type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string }[] = [];
+
+    const namePos = (full as any)?.name_position;
+    if (namePos) {
+      const x = getAbsX(namePos);
+      const y = getAbsY(namePos);
+      if (x != null && y != null) {
+        els.push({ type: 'name', x: Math.round(x), y: Math.round(y), fontFamily: String(namePos.fontFamily || 'Arial'), fontSize: Number(namePos.fontSize || 28), rotation: Number(namePos.rotation || 0), color: String(namePos.color || '#000') });
+      }
+    }
+    const datePos = (full as any)?.date_position;
+    if (datePos) {
+      const x = getAbsX(datePos);
+      const y = getAbsY(datePos);
+      if (x != null && y != null) {
+        els.push({ type: 'date', x: Math.round(x), y: Math.round(y), fontFamily: String(datePos.fontFamily || 'Arial'), fontSize: Number(datePos.fontSize || 16), rotation: Number(datePos.rotation || 0), color: String(datePos.color || '#333') });
+      }
+    }
+    const qrPos = (full as any)?.qr_position;
+    if (qrPos) {
+      const x = getAbsX(qrPos);
+      const y = getAbsY(qrPos);
+      if (x != null && y != null) {
+        els.push({ type: 'qr', x: Math.round(x), y: Math.round(y), width: Number(qrPos.width || qrPos.size || 120), height: Number(qrPos.height || qrPos.size || 120), rotation: Number(qrPos.rotation || 0) });
+      }
+    }
+    if (els.length) {
+      this.editorElements.set(els);
+      this.selectedElementIndex.set(0);
+    } else {
+      this.editorElements.set([]);
+      this.selectedElementIndex.set(null);
+    }
+  }
 
   // Referencia a Math para usar en la plantilla
   Math = Math;
@@ -262,42 +355,10 @@ export class TemplatesComponent implements OnInit {
     this.templateService.getTemplate(template.id).subscribe({
       next: (res) => {
         const full = res?.data?.template || template;
-          this.selectedTemplate.set(full);
-          this.uploadedPreviewUrl = (full?.file_url || full?.file_path || this.uploadedPreviewUrl);
-          const offX = Number(full?.template_styles?.background_offset?.x ?? 0);
-          const offY = Number(full?.template_styles?.background_offset?.y ?? 0);
-        this.backgroundOffset.set({ x: Math.round(offX), y: Math.round(offY) });
-        const els: { type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string }[] = [];
-        const namePos = (full as any)?.name_position;
-        if (namePos) {
-          const x = namePos.x != null ? Number(namePos.x) : (namePos.left != null ? Number(namePos.left) : null);
-          const y = namePos.y != null ? Number(namePos.y) : (namePos.top != null ? Number(namePos.top) : null);
-          if (x != null && y != null) {
-            els.push({ type: 'name', x: Math.round(x), y: Math.round(y), fontFamily: String(namePos.fontFamily || 'Arial'), fontSize: Number(namePos.fontSize || 28), rotation: Number(namePos.rotation || 0), color: String(namePos.color || '#000') });
-          }
-        }
-        const datePos = (full as any)?.date_position;
-        if (datePos) {
-          const x = datePos.x != null ? Number(datePos.x) : (datePos.left != null ? Number(datePos.left) : null);
-          const y = datePos.y != null ? Number(datePos.y) : (datePos.top != null ? Number(datePos.top) : null);
-          if (x != null && y != null) {
-            els.push({ type: 'date', x: Math.round(x), y: Math.round(y), fontFamily: String(datePos.fontFamily || 'Arial'), fontSize: Number(datePos.fontSize || 16), rotation: Number(datePos.rotation || 0), color: String(datePos.color || '#333') });
-          }
-        }
-        const qrPos = (full as any)?.qr_position;
-        if (qrPos) {
-          const x = qrPos.x != null ? Number(qrPos.x) : (qrPos.left != null ? Number(qrPos.left) : null);
-          const y = qrPos.y != null ? Number(qrPos.y) : (qrPos.top != null ? Number(qrPos.top) : null);
-          if (x != null && y != null) {
-            els.push({ type: 'qr', x: Math.round(x), y: Math.round(y), width: Number(qrPos.width || qrPos.size || 120), height: Number(qrPos.height || qrPos.size || 120), rotation: Number(qrPos.rotation || 0) });
-          }
-        }
-        if (els.length) {
-          this.editorElements.set(els);
-          this.selectedElementIndex.set(0);
-        }
+        this.selectedTemplate.set(full);
+        this.loadTemplateToSignals(full);
       },
-      error: () => {}
+      error: () => { }
     });
   }
 
@@ -430,6 +491,8 @@ export class TemplatesComponent implements OnInit {
     const namePosCreate = this.computeOriginAdjusted(nameEl!);
     formData.append('name_position[x]', String(namePosCreate.x));
     formData.append('name_position[y]', String(namePosCreate.y));
+    formData.append('name_position[left]', String(Math.round(nameEl.x)));
+    formData.append('name_position[top]', String(Math.round(nameEl.y)));
     formData.append('name_position[fontSize]', String(nameEl.fontSize || 28));
     formData.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
     formData.append('name_position[color]', String(nameEl.color || '#000'));
@@ -439,6 +502,8 @@ export class TemplatesComponent implements OnInit {
       const datePosCreate = this.computeOriginAdjusted(dateEl);
       formData.append('date_position[x]', String(datePosCreate.x));
       formData.append('date_position[y]', String(datePosCreate.y));
+      formData.append('date_position[left]', String(Math.round(dateEl.x)));
+      formData.append('date_position[top]', String(Math.round(dateEl.y)));
       formData.append('date_position[fontSize]', String(dateEl.fontSize || 16));
       formData.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
       formData.append('date_position[color]', String(dateEl.color || '#333'));
@@ -449,6 +514,8 @@ export class TemplatesComponent implements OnInit {
       const qrPosCreate = this.computeOriginAdjusted(qrEl);
       formData.append('qr_position[x]', String(qrPosCreate.x));
       formData.append('qr_position[y]', String(qrPosCreate.y));
+      formData.append('qr_position[left]', String(Math.round(qrEl.x)));
+      formData.append('qr_position[top]', String(Math.round(qrEl.y)));
       formData.append('qr_position[width]', String(qrEl.width || 120));
       formData.append('qr_position[height]', String(qrEl.height || 120));
       formData.append('qr_position[rotation]', String(qrEl.rotation || 0));
@@ -592,6 +659,8 @@ export class TemplatesComponent implements OnInit {
         const namePos = this.computeOriginAdjusted(nameEl);
         formData.append('name_position[x]', String(namePos.x));
         formData.append('name_position[y]', String(namePos.y));
+        formData.append('name_position[left]', String(Math.round(nameEl.x)));
+        formData.append('name_position[top]', String(Math.round(nameEl.y)));
         formData.append('name_position[fontSize]', String(nameEl.fontSize || 28));
         formData.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
         formData.append('name_position[color]', String(nameEl.color || '#000'));
@@ -601,6 +670,8 @@ export class TemplatesComponent implements OnInit {
         const datePos = this.computeOriginAdjusted(dateEl);
         formData.append('date_position[x]', String(datePos.x));
         formData.append('date_position[y]', String(datePos.y));
+        formData.append('date_position[left]', String(Math.round(dateEl.x)));
+        formData.append('date_position[top]', String(Math.round(dateEl.y)));
         formData.append('date_position[fontSize]', String(dateEl.fontSize || 16));
         formData.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
         formData.append('date_position[color]', String(dateEl.color || '#333'));
@@ -610,6 +681,8 @@ export class TemplatesComponent implements OnInit {
         const qrPos = this.computeOriginAdjusted(qrEl);
         formData.append('qr_position[x]', String(qrPos.x));
         formData.append('qr_position[y]', String(qrPos.y));
+        formData.append('qr_position[left]', String(Math.round(qrEl.x)));
+        formData.append('qr_position[top]', String(Math.round(qrEl.y)));
         formData.append('qr_position[width]', String(qrEl.width || 120));
         formData.append('qr_position[height]', String(qrEl.height || 120));
         formData.append('qr_position[rotation]', String(qrEl.rotation || 0));
@@ -645,120 +718,114 @@ export class TemplatesComponent implements OnInit {
 
   // Editor visual
   openPositionEditor(): void {
-    const useTpl = (t: any) => {
-      const currentUrl = (t?.file_url || t?.file_path || this.uploadedPreviewUrl || null);
-      if (!currentUrl) {
-        this.errorMessage.set('Sube una imagen de fondo de plantilla para editar posiciones.');
-        return;
-      }
-      this.uploadedPreviewUrl = currentUrl;
-      const img = new Image();
-      img.onload = () => {
-        this.backgroundImageSize.set({ width: img.naturalWidth, height: img.naturalHeight });
-      };
-      img.src = currentUrl as string;
-      const offX = Number(t?.template_styles?.background_offset?.x ?? this.backgroundOffset().x ?? 0);
-      const offY = Number(t?.template_styles?.background_offset?.y ?? this.backgroundOffset().y ?? 0);
-      this.backgroundOffset.set({ x: Math.round(offX), y: Math.round(offY) });
-      const els: { type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string }[] = [];
-      const namePos = t?.name_position;
-      if (namePos) {
-        const x = namePos.x != null ? Number(namePos.x) : (namePos.left != null ? Number(namePos.left) : null);
-        const y = namePos.y != null ? Number(namePos.y) : (namePos.top != null ? Number(namePos.top) : null);
-        if (x != null && y != null) {
-          els.push({ type: 'name', x: Math.round(x), y: Math.round(y), fontFamily: String(namePos.fontFamily || 'Arial'), fontSize: Number(namePos.fontSize || 28), rotation: Number(namePos.rotation || 0), color: String(namePos.color || '#000') });
-        }
-      }
-      const datePos = t?.date_position;
-      if (datePos) {
-        const x = datePos.x != null ? Number(datePos.x) : (datePos.left != null ? Number(datePos.left) : null);
-        const y = datePos.y != null ? Number(datePos.y) : (datePos.top != null ? Number(datePos.top) : null);
-        if (x != null && y != null) {
-          els.push({ type: 'date', x: Math.round(x), y: Math.round(y), fontFamily: String(datePos.fontFamily || 'Arial'), fontSize: Number(datePos.fontSize || 16), rotation: Number(datePos.rotation || 0), color: String(datePos.color || '#333') });
-        }
-      }
-      const qrPos = t?.qr_position;
-      if (qrPos) {
-        const x = qrPos.x != null ? Number(qrPos.x) : (qrPos.left != null ? Number(qrPos.left) : null);
-        const y = qrPos.y != null ? Number(qrPos.y) : (qrPos.top != null ? Number(qrPos.top) : null);
-        if (x != null && y != null) {
-          els.push({ type: 'qr', x: Math.round(x), y: Math.round(y), width: Number(qrPos.width || qrPos.size || 120), height: Number(qrPos.height || qrPos.size || 120), rotation: Number(qrPos.rotation || 0) });
-        }
-      }
-      if (els.length) {
-        this.editorElements.set(els);
-        this.selectedElementIndex.set(0);
-      } else {
-        // No agregar elementos por defecto aún; esperar a medir el lienzo
-        this.editorElements.set([]);
-        this.selectedElementIndex.set(null);
-      }
-      this.showEditor.set(true);
-      setTimeout(() => {
-        const bgImgEl = document.querySelector('.editor-background') as HTMLImageElement | null;
-        const adjust = () => {
-          const layerEl = document.querySelector('.editor-layer') as HTMLElement | null;
-          const w = layerEl ? layerEl.clientWidth : (bgImgEl ? bgImgEl.clientWidth : 0);
-          const h = layerEl ? layerEl.clientHeight : (bgImgEl ? bgImgEl.clientHeight : 0);
-          if (w > 0 && h > 0) {
-            this.editorCanvasSize.set({ width: w, height: h });
-            const origin = String(t?.template_styles?.coords_origin || 'center').toLowerCase();
-            if (origin === 'center') {
-              const midX = Math.round(w / 2);
-              const midY = Math.round(h / 2);
-              const els2 = this.editorElements().map(el => {
-                const x = Math.round((el.x || 0) + midX);
-                const y = Math.round((el.y || 0) + midY);
-                return { ...el, x, y };
-              });
-              this.editorElements.set(els2);
-            }
-            if (this.editorElements().length === 0) {
-              this.addNameElement(true);
-            }
-          } else {
-            setTimeout(adjust, 50);
-          }
-        };
-        if (bgImgEl && bgImgEl.complete) {
-          adjust();
-        } else if (bgImgEl) {
-          bgImgEl.addEventListener('load', adjust, { once: true });
-        } else {
-          adjust();
-        }
-      }, 0);
+    // Snapshot state for undo
+    this.snapshotState();
+
+    const currentUrl = this.uploadedPreviewUrl;
+    if (!currentUrl) {
+      this.errorMessage.set('Sube una imagen de fondo de plantilla para editar posiciones.');
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      this.backgroundImageSize.set({ width: img.naturalWidth, height: img.naturalHeight });
     };
+    img.src = currentUrl;
 
-    if (this.uploadedPreviewUrl && !this.selectedTemplate()) {
-      useTpl({});
-      return;
-    }
+    this.showEditor.set(true);
 
-    const tpl = this.selectedTemplate();
-    if (!tpl) {
-      useTpl({});
-      return;
-    }
-    const hasPositions = !!((((tpl as any).name_position) || ((tpl as any).date_position) || ((tpl as any).qr_position)) || tpl.file_url);
-    if (hasPositions) {
-      useTpl(tpl);
-      return;
-    }
-    if (tpl.id) {
-      this.templateService.getTemplate(tpl.id).subscribe({
-        next: (res) => {
-          const full = res?.data?.template || tpl;
-          this.selectedTemplate.set(full);
-          useTpl(full);
-        },
-        error: () => {
-          useTpl(tpl);
+    // Logic to adjust to current canvas size (responsive)
+    setTimeout(() => {
+      const bgImgEl = document.querySelector('.editor-background') as HTMLImageElement | null;
+      const adjust = () => {
+        const layerEl = document.querySelector('.editor-layer') as HTMLElement | null;
+        const w = layerEl ? layerEl.clientWidth : (bgImgEl ? bgImgEl.clientWidth : 0);
+        const h = layerEl ? layerEl.clientHeight : (bgImgEl ? bgImgEl.clientHeight : 0);
+
+        if (w > 0 && h > 0) {
+          // Current display size
+          const currentW = w;
+          const currentH = h;
+
+          // Saved canvas size (from DB or previous edit)
+          const savedW = this.editorCanvasSize()?.width || 0;
+          const savedH = this.editorCanvasSize()?.height || 0;
+
+          // Update current canvas size
+          this.editorCanvasSize.set({ width: w, height: h });
+
+          // Calculate scale if we have a saved size
+          const scaleX = savedW > 0 ? currentW / savedW : 1;
+          const scaleY = savedH > 0 ? currentH / savedH : 1;
+
+          // If scale is effectively 1, we don't need to do anything special IF the elements are already loaded correctly.
+          // But we should re-verify positions just in case.
+
+          // However, editorElements are already loaded via loadTemplateToSignals or preserved.
+          // They contain the positions relative to the SAVED canvas (or absolute).
+          // Wait, loadTemplateToSignals loads them as they were saved.
+          // If they were saved with absolute pixels (left/top), we should prioritize that?
+          // Actually, the previous fix in openPositionEditor handled this re-mapping.
+          // We should keep that re-mapping logic but apply it to the CURRENT signals.
+
+          const els2 = this.editorElements().map(el => {
+            // Logic similar to previous fix: determine base pos, then scale
+            let baseX = el.x;
+            let baseY = el.y;
+
+            // Try to find absolute coords if stored in the element (we added them in getElementAsPos, but loadTemplateToSignals might not have them if not saved)
+            // Actually loadTemplateToSignals does NOT put 'left'/'top' into the editorElements array items directly, 
+            // it puts 'x' and 'y'.
+            // But wait, 'x' and 'y' in editorElements are intended to be current canvas relative?
+            // Yes.
+
+            // If we just loaded from DB, 'x' and 'y' are from the DB.
+            // If DB has 'left'/'top', we should use them as base if possible?
+            // loadTemplateToSignals uses:
+            // x = namePos.x ...
+
+            // If we want to support responsive scaling, we need to know the ORIGINAL canvas size of those coordinates.
+            // That is 'savedW' / 'savedH'.
+
+            // So:
+            // 1. Take current el.x / el.y (which are from DB/State)
+            // 2. Assume they are relative to savedW/savedH
+            // 3. Scale to currentW/currentH
+
+            // BUT, what if we have absolute coordinates?
+            // In loadTemplateToSignals, we didn't store 'left'/'top' in the editorElement object.
+            // We should probably have stored them if we wanted to use them here.
+            // However, the previous fix relied on 't' (the raw template).
+            // Now 't' is gone, we only have signals.
+
+            // If we want to be robust, we should trust that el.x/el.y are correct for the savedCanvasSize.
+            // So scaling them is the right approach.
+
+            const newX = el.x * scaleX;
+            const newY = el.y * scaleY;
+
+            return { ...el, x: Math.round(newX), y: Math.round(newY) };
+          });
+
+          this.editorElements.set(els2);
+
+          if (this.editorElements().length === 0) {
+            this.addNameElement(true);
+          }
+        } else {
+          setTimeout(adjust, 50);
         }
-      });
-      return;
-    }
-    useTpl({});
+      };
+
+      if (bgImgEl && bgImgEl.complete) {
+        adjust();
+      } else if (bgImgEl) {
+        bgImgEl.addEventListener('load', adjust, { once: true });
+      } else {
+        adjust();
+      }
+    }, 0);
   }
 
   closePositionEditor(): void {
@@ -767,88 +834,15 @@ export class TemplatesComponent implements OnInit {
   }
 
   cancelEditor(): void {
+    this.restoreState();
     this.closePositionEditor();
   }
 
   saveEditor(): void {
-    const tpl = this.selectedTemplate();
-    if (tpl && tpl.id) {
-      const fd = new FormData();
-      fd.append('_method', 'PUT');
-      const bg = this.backgroundOffset();
-      fd.append('template_styles[background_offset][x]', String(Math.round(bg.x)));
-      fd.append('template_styles[background_offset][y]', String(Math.round(bg.y)));
-      const bgSz = this.backgroundImageSize();
-      if (bgSz) {
-        fd.append('background_image_size[width]', String(bgSz.width));
-        fd.append('background_image_size[height]', String(bgSz.height));
-      }
-      const canSz = this.editorCanvasSize();
-      if (canSz) {
-        fd.append('template_styles[editor_canvas_size][width]', String(Math.round(canSz.width)));
-        fd.append('template_styles[editor_canvas_size][height]', String(Math.round(canSz.height)));
-      }
-      fd.append('template_styles[coords_origin]', 'left-top');
-      const nameEl = this.editorElements().find(el => el.type === 'name');
-      const dateEl = this.editorElements().find(el => el.type === 'date');
-      const qrEl = this.editorElements().find(el => el.type === 'qr');
-      if (nameEl) {
-        const namePos = this.computeOriginAdjusted(nameEl);
-        fd.append('name_position[x]', String(namePos.x));
-        fd.append('name_position[y]', String(namePos.y));
-        fd.append('name_position[left]', String(Math.round(nameEl.x))); // absoluto
-        fd.append('name_position[top]', String(Math.round(nameEl.y)));  // absoluto
-        fd.append('name_position[fontSize]', String(nameEl.fontSize || 28));
-        fd.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
-        fd.append('name_position[color]', String(nameEl.color || '#000'));
-        fd.append('name_position[rotation]', String(nameEl.rotation || 0));
-        fd.append('name_position[textAlign]', 'left');
-      }
-      if (dateEl) {
-        const datePos = this.computeOriginAdjusted(dateEl);
-        fd.append('date_position[x]', String(datePos.x));
-        fd.append('date_position[y]', String(datePos.y));
-        fd.append('date_position[left]', String(Math.round(dateEl.x))); // absoluto
-        fd.append('date_position[top]', String(Math.round(dateEl.y)));  // absoluto
-        fd.append('date_position[fontSize]', String(dateEl.fontSize || 16));
-        fd.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
-        fd.append('date_position[color]', String(dateEl.color || '#333'));
-        fd.append('date_position[rotation]', String(dateEl.rotation || 0));
-        fd.append('date_position[textAlign]', 'left');
-      }
-      if (qrEl) {
-        const qrPos = this.computeOriginAdjusted(qrEl);
-        fd.append('qr_position[x]', String(qrPos.x));
-        fd.append('qr_position[y]', String(qrPos.y));
-        fd.append('qr_position[left]', String(Math.round(qrEl.x))); // absoluto
-        fd.append('qr_position[top]', String(Math.round(qrEl.y)));  // absoluto
-        fd.append('qr_position[width]', String(qrEl.width || 120));
-        fd.append('qr_position[height]', String(qrEl.height || 120));
-        fd.append('qr_position[size]', String(qrEl.width || 120)); // compatibilidad
-        fd.append('qr_position[rotation]', String(qrEl.rotation || 0));
-      }
-      this.isLoading.set(true);
-      this.templateService.updateTemplate(tpl.id, fd).subscribe({
-        next: (res) => {
-          this.isLoading.set(false);
-          if (res.success) {
-            this.successMessage.set('Posiciones actualizadas');
-            this.loadTemplates();
-          } else {
-            this.errorMessage.set(res.message || 'Error al actualizar posiciones');
-          }
-          this.closePositionEditor();
-        },
-        error: (err) => {
-          this.isLoading.set(false);
-          this.errorMessage.set(err?.error?.message || 'Error al actualizar posiciones');
-          this.closePositionEditor();
-        }
-      });
-    } else {
-      this.successMessage.set('Editor listo: posiciones guardadas para enviar.');
-      this.closePositionEditor();
-    }
+    // No guardamos en BD, solo cerramos. Los cambios quedan en los signals (editorElements, etc)
+    // y se enviarán cuando el usuario haga clic en "Actualizar Plantilla" o "Crear Plantilla".
+    this.successMessage.set('Posiciones listas. Recuerda guardar la plantilla para aplicar los cambios.');
+    this.closePositionEditor();
   }
 
   updateBackgroundOffsetX(event: Event): void {
@@ -1009,6 +1003,7 @@ export class TemplatesComponent implements OnInit {
     const idx = this.selectedElementIndex();
     if (idx === null) return;
     const canvasRect = this.getCanvasRect();
+    if (canvasRect.width === 0 || canvasRect.height === 0) return;
     const domEls = Array.from(document.querySelectorAll('.editor-element')) as HTMLElement[];
     const domEl = domEls[idx] || null;
     const elW = domEl ? domEl.offsetWidth : (this.editorElements()[idx].type === 'qr' ? (this.editorElements()[idx].width || 0) : 1);
@@ -1017,7 +1012,10 @@ export class TemplatesComponent implements OnInit {
     const maxY = Math.max(0, canvasRect.height - elH);
     const els = [...this.editorElements()];
     const cur = els[idx];
-    els[idx] = { ...cur, x: Math.max(0, Math.min(cur.x || 0, maxX)), y: Math.max(0, Math.min(cur.y || 0, maxY)) };
+    // Ensure x and y are numbers
+    const currentX = Number(cur.x) || 0;
+    const currentY = Number(cur.y) || 0;
+    els[idx] = { ...cur, x: Math.max(0, Math.min(currentX, maxX)), y: Math.max(0, Math.min(currentY, maxY)) };
     this.editorElements.set(els);
   }
 
@@ -1064,6 +1062,28 @@ export class TemplatesComponent implements OnInit {
     if (!el) return 0;
     const canvasRect = this.getCanvasRect();
     return Math.round((el.y || 0) - (canvasRect.height / 2));
+  }
+
+  private getElementAsPos(type: 'name' | 'date' | 'qr'): any {
+    const el = this.editorElements().find(e => e.type === type);
+    if (!el) return null;
+
+    // Calcular relativas
+    const rel = this.computeOriginAdjusted(el);
+
+    return {
+      x: rel.x,
+      y: rel.y,
+      left: Math.round(el.x),
+      top: Math.round(el.y),
+      width: el.width,
+      height: el.height,
+      fontSize: el.fontSize,
+      fontFamily: el.fontFamily,
+      color: el.color,
+      rotation: el.rotation,
+      textAlign: 'left'
+    };
   }
 
   @HostListener('window:keydown', ['$event'])

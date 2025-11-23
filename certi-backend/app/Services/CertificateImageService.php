@@ -67,32 +67,50 @@ class CertificateImageService
             // Dimensiones reales de la imagen y del lienzo del editor (si se guardó)
             $imgW = $image->width();
             $imgH = $image->height();
+            
+            // Obtener dimensiones del canvas del editor
             $editorCanvas = null;
             if (is_array($template->template_styles ?? null)) {
                 $editorCanvas = $template->template_styles['editor_canvas_size'] ?? null;
             }
-            $bgSize = is_array($template->background_image_size ?? null) ? $template->background_image_size : null;
-            $bgW = (int)($bgSize['width'] ?? 0);
-            $bgH = (int)($bgSize['height'] ?? 0);
+            
             $editorW = (int)($editorCanvas['width'] ?? 0);
             $editorH = (int)($editorCanvas['height'] ?? 0);
-            $baseW = $editorW ?: ($bgW ?: $imgW);
-            $baseH = $editorH ?: ($bgH ?: $imgH);
-            $scaleX = $baseW > 0 ? ($imgW / $baseW) : 1.0;
-            $scaleY = $baseH > 0 ? ($imgH / $baseH) : 1.0;
-            $uniform = $editorW > 0 ? ($imgW / $editorW) : (($scaleX + $scaleY) / 2.0);
+
+            // Si no hay dimensiones del editor, intentamos usar las dimensiones guardadas de la imagen de fondo
+            // Esto es un fallback, pero lo ideal es que el frontend siempre mande el canvas size
+            if ($editorW <= 0 || $editorH <= 0) {
+                $bgSize = is_array($template->background_image_size ?? null) ? $template->background_image_size : null;
+                $editorW = (int)($bgSize['width'] ?? $imgW);
+                $editorH = (int)($bgSize['height'] ?? $imgH);
+                Log::warning('No se encontró editor_canvas_size, usando fallback', [
+                    'certificate_id' => $certificate->id,
+                    'fallback_w' => $editorW,
+                    'fallback_h' => $editorH
+                ]);
+            }
+
+            // Calcular factores de escala
+            // La lógica es: CoordenadaReal = CoordenadaEditor * (DimensionReal / DimensionEditor)
+            $scaleX = ($editorW > 0) ? ($imgW / $editorW) : 1.0;
+            $scaleY = ($editorH > 0) ? ($imgH / $editorH) : 1.0;
+            
+            // Factor uniforme para fuentes y elementos cuadrados (usamos el menor para asegurar que quepa, o promedio)
+            // Generalmente para fuentes se usa el factor vertical si el texto es horizontal, pero un promedio es seguro
+            $uniform = ($scaleX + $scaleY) / 2.0;
+
             $origin = strtolower((string)($template->template_styles['coords_origin'] ?? ''));
             $isCenter = ($origin === 'center');
-            $centerX = $editorW > 0 ? ($editorW / 2.0) : ($baseW / 2.0);
-            $centerY = $editorH > 0 ? ($editorH / 2.0) : ($baseH / 2.0);
-            Log::info('Escalado de overlays', [
-                'imgW' => $imgW,
-                'imgH' => $imgH,
-                'editorW' => $editorW,
-                'editorH' => $editorH,
-                'scaleX' => $scaleX,
-                'scaleY' => $scaleY,
-                'editorCanvasSize' => $editorCanvas,
+            
+            // Centro del editor para cálculos relativos al centro
+            $centerX = $editorW / 2.0;
+            $centerY = $editorH / 2.0;
+
+            Log::info('Cálculo de escala para generación', [
+                'image_real_size' => ['w' => $imgW, 'h' => $imgH],
+                'editor_canvas_size' => ['w' => $editorW, 'h' => $editorH],
+                'scale_factors' => ['x' => $scaleX, 'y' => $scaleY, 'uniform' => $uniform],
+                'origin_mode' => $origin
             ]);
 
             // Aplicar desplazamiento de fondo (background_offset) ajustando las posiciones de overlays
