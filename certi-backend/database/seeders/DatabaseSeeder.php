@@ -68,9 +68,6 @@ class DatabaseSeeder extends Seeder
             // Módulo Roles y Permisos
             'roles.create', 'roles.read', 'roles.update', 'roles.delete', 'permissions.read', 'permissions.assign',
 
-            // Módulo Empresas
-            'companies.create', 'companies.read', 'companies.update', 'companies.delete', 'companies.manage_own',
-
             // Módulo Actividades
             'activities.create', 'activities.read', 'activities.update', 'activities.delete', 'activities.manage_own',
 
@@ -91,7 +88,7 @@ class DatabaseSeeder extends Seeder
             'emails.send', 'emails.read', 'emails.resend', 'emails.manage_own',
 
             // Módulo Reportes
-            'reports.certificates', 'reports.validations', 'reports.activities', 'reports.users', 'reports.companies', 'reports.export',
+            'reports.certificates', 'reports.validations', 'reports.activities', 'reports.users', 'reports.export',
         ];
 
         foreach ($permissions as $permission) {

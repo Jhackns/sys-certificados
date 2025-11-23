@@ -102,16 +102,24 @@ export class UsersComponent implements OnInit {
   }
 
   passwordRequiredOnCreate = (form: FormGroup) => {
-    if (!this.isEditing() && !form.get('password')?.value) {
-      form.get('password')?.setErrors({ required: true });
-      form.get('password_confirmation')?.setErrors({ required: true });
-    } else if (form.get('password')?.value) {
-      // Only validate password strength if password is provided
-      const password = form.get('password')?.value;
-      if (password.length < 8) {
-        form.get('password')?.setErrors({ minlength: true });
+    const password = form.get('password');
+    const passwordConfirmation = form.get('password_confirmation');
+
+    if (!this.isEditing()) {
+      // In create mode, password is required
+      if (!password?.value) {
+        return { passwordRequired: true };
+      }
+      if (password.value.length < 8) {
+        return { passwordMinLength: true };
+      }
+    } else {
+      // In edit mode, password is optional but must be valid if provided
+      if (password?.value && password.value.length < 8) {
+        return { passwordMinLength: true };
       }
     }
+
     return null;
   }
 
@@ -217,7 +225,6 @@ export class UsersComponent implements OnInit {
       }
     }
     this.selectedRole = userRole;
-    console.log('Rol inicializado en edición:', this.selectedRole);
 
     // Formatear fecha para input type="date" (YYYY-MM-DD)
     let formattedDate = '';
@@ -288,8 +295,6 @@ export class UsersComponent implements OnInit {
       userData.password_confirmation = formData.password_confirmation;
     }
 
-    console.log('Rol seleccionado:', formData.role);
-
     return userData;
   }
 
@@ -298,11 +303,8 @@ export class UsersComponent implements OnInit {
       this.isLoading.set(true);
       const formData = this.prepareUserData(this.userForm.value);
 
-      console.log('Enviando datos para crear usuario:', formData);
-
       this.http.post<ApiResponse>(`${environment.apiUrl}/users`, formData).subscribe({
         next: (response) => {
-          console.log('Respuesta al crear usuario:', response);
           this.handleUserOperationResponse(response, 'crear');
         },
         error: (error) => {
@@ -327,11 +329,8 @@ export class UsersComponent implements OnInit {
       const formData = this.prepareUserData(this.userForm.value);
       const userId = this.selectedUser()!.id;
 
-      console.log('Enviando datos para actualizar usuario:', formData);
-
       this.http.put<ApiResponse>(`${environment.apiUrl}/users/${userId}`, formData).subscribe({
         next: (response) => {
-          console.log('Respuesta al actualizar usuario:', response);
           this.handleUserOperationResponse(response, 'actualizar');
         },
         error: (error) => {
@@ -460,7 +459,7 @@ export class UsersComponent implements OnInit {
   }
 
   private getFieldDisplayName(fieldName: string): string {
-    const names: {[key: string]: string} = {
+    const names: { [key: string]: string } = {
       'name': 'El nombre',
       'email': 'El correo electrónico',
       'password': 'La contraseña',

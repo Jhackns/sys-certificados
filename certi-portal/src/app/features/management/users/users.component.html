@@ -15,9 +15,9 @@
     <div *ngIf="errorMessage()" class="error-state">
       <div class="error-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="15" y1="9" x2="9" y2="15"/>
-          <line x1="9" y1="9" x2="15" y2="15"/>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
         </svg>
       </div>
       <h3>Error al cargar usuarios</h3>
@@ -34,8 +34,8 @@
         </div>
         <button class="btn btn-primary" (click)="openCreateModal()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Nuevo Usuario
         </button>
@@ -46,11 +46,7 @@
           <thead>
             <tr>
               <th>
-                <input
-                  type="checkbox"
-                  [checked]="allSelected()"
-                  (change)="toggleSelectAll($event)"
-                />
+                <input type="checkbox" [checked]="allSelected()" (change)="toggleSelectAll($event)" />
               </th>
               <th>Usuario</th>
               <th>Email</th>
@@ -62,11 +58,7 @@
           <tbody>
             <tr *ngFor="let user of users()" class="user-row">
               <td>
-                <input
-                  type="checkbox"
-                  [checked]="isSelected(user)"
-                  (change)="toggleUserSelection(user)"
-                />
+                <input type="checkbox" [checked]="isSelected(user)" (change)="toggleUserSelection(user)" />
               </td>
               <td class="user-info">
                 <div class="user-avatar">
@@ -92,8 +84,8 @@
       <div *ngIf="selectedUsers().length >= 2" class="bulk-actions">
         <button class="btn btn-danger" (click)="deleteSelectedUsers()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
           Eliminar seleccionados ({{ selectedUsers().length }})
         </button>
@@ -103,10 +95,10 @@
       <div *ngIf="users().length === 0" class="empty-state">
         <div class="empty-icon">
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
         </div>
         <h3>No hay usuarios registrados</h3>
@@ -133,14 +125,8 @@
     <form [formGroup]="userForm" (ngSubmit)="createUser()" class="modal-form">
       <div class="form-group">
         <label for="create-name">Nombre Completo</label>
-        <input
-          type="text"
-          id="create-name"
-          formControlName="name"
-          class="form-control"
-          [class.error]="getFieldError('name')"
-          placeholder="Nombre completo"
-        />
+        <input type="text" id="create-name" formControlName="name" class="form-control"
+          [class.error]="getFieldError('name')" placeholder="Nombre completo" />
         <div class="error-message" *ngIf="getFieldError('name')">
           {{ getFieldError('name') }}
         </div>
@@ -148,14 +134,8 @@
 
       <div class="form-group">
         <label for="create-email">Correo Electrónico</label>
-        <input
-          type="email"
-          id="create-email"
-          formControlName="email"
-          class="form-control"
-          [class.error]="getFieldError('email')"
-          placeholder="usuario@email.com"
-        />
+        <input type="email" id="create-email" formControlName="email" class="form-control"
+          [class.error]="getFieldError('email')" placeholder="usuario@email.com" />
         <div class="error-message" *ngIf="getFieldError('email')">
           {{ getFieldError('email') }}
         </div>
@@ -163,13 +143,8 @@
 
       <div class="form-group">
         <label for="fecha_nacimiento">Fecha de Nacimiento</label>
-        <input
-          type="date"
-          id="fecha_nacimiento"
-          formControlName="fecha_nacimiento"
-          class="form-control"
-          [class.error]="getFieldError('fecha_nacimiento')"
-        />
+        <input type="date" id="fecha_nacimiento" formControlName="fecha_nacimiento" class="form-control"
+          [class.error]="getFieldError('fecha_nacimiento')" />
         <div class="error-message" *ngIf="getFieldError('fecha_nacimiento')">
           {{ getFieldError('fecha_nacimiento') }}
         </div>
@@ -177,12 +152,7 @@
 
       <div class="form-group">
         <label for="pais">País</label>
-        <select
-          id="pais"
-          formControlName="pais"
-          class="form-control"
-          [class.error]="getFieldError('pais')"
-        >
+        <select id="pais" formControlName="pais" class="form-control" [class.error]="getFieldError('pais')">
           <option value="">Seleccione país</option>
           <option value="Argentina">Argentina</option>
           <option value="Bolivia">Bolivia</option>
@@ -202,12 +172,7 @@
 
       <div class="form-group">
         <label for="genero">Género</label>
-        <select
-          id="genero"
-          formControlName="genero"
-          class="form-control"
-          [class.error]="getFieldError('genero')"
-        >
+        <select id="genero" formControlName="genero" class="form-control" [class.error]="getFieldError('genero')">
           <option value="">Seleccionar género</option>
           <option value="Masculino">Masculino</option>
           <option value="Femenino">Femenino</option>
@@ -220,14 +185,8 @@
 
       <div class="form-group">
         <label for="telefono">Teléfono</label>
-        <input
-          type="text"
-          id="telefono"
-          formControlName="telefono"
-          class="form-control"
-          [class.error]="getFieldError('telefono')"
-          placeholder="Número de teléfono"
-        />
+        <input type="text" id="telefono" formControlName="telefono" class="form-control"
+          [class.error]="getFieldError('telefono')" placeholder="Número de teléfono" />
         <div class="error-message" *ngIf="getFieldError('telefono')">
           {{ getFieldError('telefono') }}
         </div>
@@ -236,23 +195,14 @@
       <div class="form-group">
         <label for="activo">Estado de la cuenta</label>
         <div class="checkbox-single">
-          <input
-            type="checkbox"
-            id="activo"
-            formControlName="activo"
-          />
+          <input type="checkbox" id="activo" formControlName="activo" />
           <label for="activo">Cuenta activa</label>
         </div>
       </div>
 
       <div class="form-group">
         <label for="create-role">Rol <span class="required">*</span></label>
-        <select
-          id="create-role"
-          formControlName="role"
-          class="form-control"
-          [class.error]="getFieldError('role')"
-        >
+        <select id="create-role" formControlName="role" class="form-control" [class.error]="getFieldError('role')">
           <option value="">Seleccionar rol</option>
           <option *ngFor="let role of availableRoles()" [value]="role.name">
             {{ role.name }}
@@ -265,14 +215,8 @@
 
       <div class="form-group">
         <label for="password">Contraseña <span class="required">*</span></label>
-        <input
-          type="password"
-          id="password"
-          formControlName="password"
-          class="form-control"
-          [class.error]="getFieldError('password')"
-          placeholder="Mínimo 8 caracteres"
-        />
+        <input type="password" id="password" formControlName="password" autocomplete="new-password" class="form-control"
+          [class.error]="getFieldError('password')" placeholder="Mínimo 8 caracteres" />
         <div class="error-message" *ngIf="getFieldError('password')">
           {{ getFieldError('password') }}
         </div>
@@ -280,14 +224,9 @@
 
       <div class="form-group">
         <label for="password_confirmation">Confirmar Contraseña <span class="required">*</span></label>
-        <input
-          type="password"
-          id="password_confirmation"
-          formControlName="password_confirmation"
-          class="form-control"
-          [class.error]="getFieldError('password_confirmation')"
-          placeholder="Repite la contraseña"
-        />
+        <input type="password" id="password_confirmation" formControlName="password_confirmation"
+          autocomplete="new-password" class="form-control" [class.error]="getFieldError('password_confirmation')"
+          placeholder="Repite la contraseña" />
         <div class="error-message" *ngIf="getFieldError('password_confirmation')">
           {{ getFieldError('password_confirmation') }}
         </div>
@@ -314,14 +253,8 @@
     <form [formGroup]="userForm" (ngSubmit)="updateUser()" class="modal-form">
       <div class="form-group">
         <label for="edit-name">Nombre Completo</label>
-        <input
-          type="text"
-          id="edit-name"
-          formControlName="name"
-          class="form-control"
-          [class.error]="getFieldError('name')"
-          placeholder="Nombre completo"
-        />
+        <input type="text" id="edit-name" formControlName="name" class="form-control"
+          [class.error]="getFieldError('name')" placeholder="Nombre completo" />
         <div class="error-message" *ngIf="getFieldError('name')">
           {{ getFieldError('name') }}
         </div>
@@ -329,14 +262,8 @@
 
       <div class="form-group">
         <label for="edit-email">Correo Electrónico</label>
-        <input
-          type="email"
-          id="edit-email"
-          formControlName="email"
-          class="form-control"
-          [class.error]="getFieldError('email')"
-          placeholder="usuario@email.com"
-        />
+        <input type="email" id="edit-email" formControlName="email" class="form-control"
+          [class.error]="getFieldError('email')" placeholder="usuario@email.com" />
         <div class="error-message" *ngIf="getFieldError('email')">
           {{ getFieldError('email') }}
         </div>
@@ -344,13 +271,8 @@
 
       <div class="form-group">
         <label for="edit-fecha_nacimiento">Fecha de Nacimiento</label>
-        <input
-          type="date"
-          id="edit-fecha_nacimiento"
-          formControlName="fecha_nacimiento"
-          class="form-control"
-          [class.error]="getFieldError('fecha_nacimiento')"
-        />
+        <input type="date" id="edit-fecha_nacimiento" formControlName="fecha_nacimiento" class="form-control"
+          [class.error]="getFieldError('fecha_nacimiento')" />
         <div class="error-message" *ngIf="getFieldError('fecha_nacimiento')">
           {{ getFieldError('fecha_nacimiento') }}
         </div>
@@ -358,12 +280,7 @@
 
       <div class="form-group">
         <label for="edit-pais">País</label>
-        <select
-          id="edit-pais"
-          formControlName="pais"
-          class="form-control"
-          [class.error]="getFieldError('pais')"
-        >
+        <select id="edit-pais" formControlName="pais" class="form-control" [class.error]="getFieldError('pais')">
           <option value="">Seleccione país</option>
           <option value="Argentina">Argentina</option>
           <option value="Bolivia">Bolivia</option>
@@ -383,12 +300,7 @@
 
       <div class="form-group">
         <label for="edit-genero">Género</label>
-        <select
-          id="edit-genero"
-          formControlName="genero"
-          class="form-control"
-          [class.error]="getFieldError('genero')"
-        >
+        <select id="edit-genero" formControlName="genero" class="form-control" [class.error]="getFieldError('genero')">
           <option value="">Seleccionar género</option>
           <option value="Masculino">Masculino</option>
           <option value="Femenino">Femenino</option>
@@ -401,14 +313,8 @@
 
       <div class="form-group">
         <label for="edit-telefono">Teléfono</label>
-        <input
-          type="text"
-          id="edit-telefono"
-          formControlName="telefono"
-          class="form-control"
-          [class.error]="getFieldError('telefono')"
-          placeholder="Número de teléfono"
-        />
+        <input type="text" id="edit-telefono" formControlName="telefono" class="form-control"
+          [class.error]="getFieldError('telefono')" placeholder="Número de teléfono" />
         <div class="error-message" *ngIf="getFieldError('telefono')">
           {{ getFieldError('telefono') }}
         </div>
@@ -417,23 +323,14 @@
       <div class="form-group">
         <label for="edit-activo">Estado de la cuenta</label>
         <div class="checkbox-single">
-          <input
-            type="checkbox"
-            id="edit-activo"
-            formControlName="activo"
-          />
+          <input type="checkbox" id="edit-activo" formControlName="activo" />
           <label for="edit-activo">Cuenta activa</label>
         </div>
       </div>
 
       <div class="form-group">
         <label for="edit-role">Rol <span class="required">*</span></label>
-        <select
-          id="edit-role"
-          formControlName="role"
-          class="form-control"
-          [class.error]="getFieldError('role')"
-        >
+        <select id="edit-role" formControlName="role" class="form-control" [class.error]="getFieldError('role')">
           <option value="">Seleccionar rol</option>
           <option *ngFor="let role of availableRoles()" [value]="role.name">
             {{ role.name }}
@@ -446,14 +343,8 @@
 
       <div class="form-group">
         <label for="edit-password">Nueva Contraseña (opcional)</label>
-        <input
-          type="password"
-          id="edit-password"
-          formControlName="password"
-          class="form-control"
-          [class.error]="getFieldError('password')"
-          placeholder="Dejar vacío para mantener la actual"
-        />
+        <input type="password" id="edit-password" formControlName="password" class="form-control"
+          [class.error]="getFieldError('password')" placeholder="Dejar vacío para mantener la actual" />
         <div class="error-message" *ngIf="getFieldError('password')">
           {{ getFieldError('password') }}
         </div>
@@ -461,14 +352,9 @@
 
       <div class="form-group">
         <label for="edit-password_confirmation">Confirmar Nueva Contraseña</label>
-        <input
-          type="password"
-          id="edit-password_confirmation"
-          formControlName="password_confirmation"
-          class="form-control"
-          [class.error]="getFieldError('password_confirmation')"
-          placeholder="Repite la nueva contraseña"
-        />
+        <input type="password" id="edit-password_confirmation" formControlName="password_confirmation"
+          class="form-control" [class.error]="getFieldError('password_confirmation')"
+          placeholder="Repite la nueva contraseña" />
         <div class="error-message" *ngIf="getFieldError('password_confirmation')">
           {{ getFieldError('password_confirmation') }}
         </div>
@@ -496,9 +382,9 @@
     <div class="modal-body">
       <div class="warning-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
       </div>
       <p>¿Estás seguro de que quieres eliminar al usuario <strong>{{ selectedUser()?.name }}</strong>?</p>
@@ -524,9 +410,9 @@
     <div class="modal-body">
       <div class="warning-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
       </div>
       <p>¿Estás seguro de que quieres eliminar al usuario <strong>{{ selectedUser()?.name }}</strong>?</p>

@@ -142,7 +142,7 @@ export class RolesComponent implements OnInit {
 
               this.permissions.set(allPermissions);
               this.permissionsGrouped.set(groupedPermissions);
-              
+
               console.log('Permissions loaded successfully:', {
                 grouped: groupedPermissions,
                 total: allPermissions.length
@@ -301,12 +301,17 @@ export class RolesComponent implements OnInit {
             setTimeout(() => this.successMessage.set(''), 3000);
           } else {
             this.errorMessage.set(response.message || 'Error al eliminar rol');
+            this.closeModals();
+            setTimeout(() => this.errorMessage.set(''), 5000);
           }
         },
         error: (error) => {
           this.isLoading.set(false);
-          this.errorMessage.set('Error al eliminar rol');
+          const errorMsg = error?.error?.message || error?.message || 'Error al eliminar rol';
+          this.errorMessage.set(errorMsg);
           console.error('Error deleting role:', error);
+          this.closeModals();
+          setTimeout(() => this.errorMessage.set(''), 5000);
         }
       });
     }
@@ -328,8 +333,8 @@ export class RolesComponent implements OnInit {
 
   onPermissionChange(event: any, permissionName: string, formType: 'create' | 'edit' = 'create'): void {
     const form = formType === 'create' ? this.roleForm : this.updateRoleForm;
-    const permissions = form.get('permissions')?.value || [];
-    
+    const permissions = [...(form.get('permissions')?.value || [])]; // Clone array
+
     if (event.target.checked) {
       if (!permissions.includes(permissionName)) {
         permissions.push(permissionName);
@@ -340,7 +345,9 @@ export class RolesComponent implements OnInit {
         permissions.splice(index, 1);
       }
     }
-    form.patchValue({ permissions });
+
+    // Use setValue with emitEvent: false to preserve scroll position
+    form.get('permissions')?.setValue(permissions, { emitEvent: false });
   }
 
   formatDate(dateString: string): string {
@@ -364,7 +371,7 @@ export class RolesComponent implements OnInit {
       .join(', ');
   }
 
-  getPermissionsGrouped(): Array<{key: string, value: any[]}> {
+  getPermissionsGrouped(): Array<{ key: string, value: any[] }> {
     return Object.entries(this.permissionsGrouped()).map(([key, value]) => ({
       key,
       value
@@ -382,37 +389,37 @@ export class RolesComponent implements OnInit {
   }
 
   // Filtrar permisos basado en la búsqueda
-  getFilteredPermissions(): Array<{key: string, value: Permission[]}> {
+  getFilteredPermissions(): Array<{ key: string, value: Permission[] }> {
     const query = this.searchQuery().toLowerCase();
     const grouped = this.permissionsGrouped();
-    
+
     // Verificar que grouped sea un objeto válido y no esté vacío
     if (!grouped || typeof grouped !== 'object' || Object.keys(grouped).length === 0) {
       return [];
     }
-    
+
     if (!query) {
       return Object.entries(grouped).map(([key, value]) => ({ key, value }));
     }
 
-    const filteredGroups: Array<{key: string, value: Permission[]}> = [];
-    
+    const filteredGroups: Array<{ key: string, value: Permission[] }> = [];
+
     Object.entries(grouped).forEach(([group, permissions]) => {
       // Verificar que permissions sea un array
       if (!Array.isArray(permissions)) {
         return;
       }
-      
-      const filtered = permissions.filter(permission => 
+
+      const filtered = permissions.filter(permission =>
         permission.name.toLowerCase().includes(query) ||
         group.toLowerCase().includes(query)
       );
-      
+
       if (filtered.length > 0) {
         filteredGroups.push({ key: group, value: filtered });
       }
     });
-    
+
     return filteredGroups;
   }
 
@@ -420,10 +427,10 @@ export class RolesComponent implements OnInit {
   onSelectAllPermissions(event: any, formType: 'create' | 'edit' = 'create'): void {
     const isChecked = event.target.checked;
     this.selectAllPermissions.set(isChecked);
-    
+
     const form = formType === 'create' ? this.roleForm : this.updateRoleForm;
     const allPermissions = this.permissions();
-    
+
     if (isChecked) {
       // Seleccionar todos los permisos
       const allPermissionNames = allPermissions.map(p => p.name);
@@ -439,7 +446,7 @@ export class RolesComponent implements OnInit {
     const form = formType === 'create' ? this.roleForm : this.updateRoleForm;
     const selectedPermissions = form.get('permissions')?.value || [];
     const allPermissions = this.permissions();
-    
+
     return allPermissions.length > 0 && selectedPermissions.length === allPermissions.length;
   }
 
@@ -448,7 +455,7 @@ export class RolesComponent implements OnInit {
     const form = formType === 'create' ? this.roleForm : this.updateRoleForm;
     const selectedPermissions = form.get('permissions')?.value || [];
     const allPermissions = this.permissions();
-    
+
     return selectedPermissions.length > 0 && selectedPermissions.length < allPermissions.length;
   }
 }

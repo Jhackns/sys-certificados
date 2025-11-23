@@ -15,9 +15,9 @@
     <div *ngIf="errorMessage()" class="error-state">
       <div class="error-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="15" y1="9" x2="9" y2="15"/>
-          <line x1="9" y1="9" x2="15" y2="15"/>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
         </svg>
       </div>
       <h3>Error al cargar roles</h3>
@@ -34,8 +34,8 @@
         </div>
         <button class="btn btn-primary" (click)="openCreateModal()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Nuevo Rol
         </button>
@@ -46,13 +46,17 @@
           <div class="role-header">
             <div class="role-icon">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
               </svg>
             </div>
             <div class="role-actions">
               <button class="btn btn-sm btn-outline" (click)="openEditModal(role)">Editar</button>
-              <button class="btn btn-sm btn-danger" (click)="openDeleteModal(role)">Eliminar</button>
+              <button class="btn btn-sm btn-danger" (click)="openDeleteModal(role)"
+                [disabled]="role.users_count && role.users_count > 0"
+                [title]="role.users_count && role.users_count > 0 ? 'Este rol está siendo utilizado por ' + role.users_count + ' usuario(s)' : 'Eliminar rol'">
+                Eliminar
+              </button>
             </div>
           </div>
 
@@ -90,8 +94,8 @@
       <div *ngIf="roles().length === 0" class="empty-state">
         <div class="empty-icon">
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+            <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
           </svg>
         </div>
         <h3>No hay roles configurados</h3>
@@ -118,14 +122,8 @@
     <form [formGroup]="roleForm" (ngSubmit)="createRole()" class="modal-form">
       <div class="form-group">
         <label for="name">Nombre del Rol</label>
-        <input
-          type="text"
-          id="name"
-          formControlName="name"
-          class="form-control"
-          [class.error]="getFieldError('name')"
-          placeholder="ej: editor_contenido"
-        />
+        <input type="text" id="name" formControlName="name" class="form-control" [class.error]="getFieldError('name')"
+          placeholder="ej: editor_contenido" />
         <div class="error-message" *ngIf="getFieldError('name')">
           {{ getFieldError('name') }}
         </div>
@@ -133,13 +131,8 @@
 
       <div class="form-group">
         <label for="description">Descripción</label>
-        <textarea
-          id="description"
-          formControlName="description"
-          class="form-control"
-          rows="3"
-          placeholder="Descripción del rol y sus responsabilidades"
-        ></textarea>
+        <textarea id="description" formControlName="description" class="form-control" rows="3"
+          placeholder="Descripción del rol y sus responsabilidades"></textarea>
       </div>
 
       <div class="form-group">
@@ -148,27 +141,20 @@
         <!-- Search and Select All Controls -->
         <div class="permissions-controls">
           <div class="search-container">
-            <input
-              type="text"
-              class="form-control search-input"
-              placeholder="Buscar permisos..."
-              [value]="searchQuery()"
-              (input)="searchQuery.set($any($event.target).value)"
-            />
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="m21 21-4.35-4.35"/>
+            <input type="text" class="form-control search-input" placeholder="Buscar permisos..."
+              [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" />
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
             </svg>
           </div>
 
           <div class="select-all-container">
             <label class="checkbox-label select-all-label">
-              <input
-                type="checkbox"
-                [checked]="areAllPermissionsSelected('create')"
+              <input type="checkbox" [checked]="areAllPermissionsSelected('create')"
                 [indeterminate]="areSomePermissionsSelected('create')"
-                (change)="onSelectAllPermissions($event, 'create')"
-              />
+                (change)="onSelectAllPermissions($event, 'create')" />
               <span>Seleccionar todos</span>
             </label>
           </div>
@@ -179,12 +165,9 @@
             <h4 class="group-title">{{ group.key | titlecase }}</h4>
             <div class="checkbox-group">
               <label *ngFor="let permission of group.value" class="checkbox-label">
-                <input
-                  type="checkbox"
-                  [value]="permission.name"
+                <input type="checkbox" [value]="permission.name"
                   (change)="onPermissionChange($event, permission.name, 'create')"
-                  [checked]="roleForm.get('permissions')?.value?.includes(permission.name)"
-                />
+                  [checked]="roleForm.get('permissions')?.value?.includes(permission.name)" />
                 <span>{{ permission.name | titlecase }}</span>
               </label>
             </div>
@@ -213,14 +196,8 @@
     <form [formGroup]="updateRoleForm" (ngSubmit)="updateRole()" class="modal-form">
       <div class="form-group">
         <label for="edit-name">Nombre del Rol</label>
-        <input
-          type="text"
-          id="edit-name"
-          formControlName="name"
-          class="form-control"
-          [class.error]="getFieldError('name', 'edit')"
-          placeholder="ej: editor_contenido"
-        />
+        <input type="text" id="edit-name" formControlName="name" class="form-control"
+          [class.error]="getFieldError('name', 'edit')" placeholder="ej: editor_contenido" />
         <div class="error-message" *ngIf="getFieldError('name', 'edit')">
           {{ getFieldError('name', 'edit') }}
         </div>
@@ -228,13 +205,8 @@
 
       <div class="form-group">
         <label for="edit-description">Descripción</label>
-        <textarea
-          id="edit-description"
-          formControlName="description"
-          class="form-control"
-          rows="3"
-          placeholder="Descripción del rol y sus responsabilidades"
-        ></textarea>
+        <textarea id="edit-description" formControlName="description" class="form-control" rows="3"
+          placeholder="Descripción del rol y sus responsabilidades"></textarea>
       </div>
 
       <div class="form-group">
@@ -243,27 +215,20 @@
         <!-- Search and Select All Controls -->
         <div class="permissions-controls">
           <div class="search-container">
-            <input
-              type="text"
-              class="form-control search-input"
-              placeholder="Buscar permisos..."
-              [value]="searchQuery()"
-              (input)="searchQuery.set($event.target.value)"
-            />
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="m21 21-4.35-4.35"/>
+            <input type="text" class="form-control search-input" placeholder="Buscar permisos..."
+              [value]="searchQuery()" (input)="searchQuery.set($event.target.value)" />
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
             </svg>
           </div>
 
           <div class="select-all-container">
             <label class="checkbox-label select-all-label">
-              <input
-                type="checkbox"
-                [checked]="areAllPermissionsSelected('edit')"
+              <input type="checkbox" [checked]="areAllPermissionsSelected('edit')"
                 [indeterminate]="areSomePermissionsSelected('edit')"
-                (change)="onSelectAllPermissions($event, 'edit')"
-              />
+                (change)="onSelectAllPermissions($event, 'edit')" />
               <span>Seleccionar todos</span>
             </label>
           </div>
@@ -274,12 +239,9 @@
             <h4 class="group-title">{{ group.key | titlecase }}</h4>
             <div class="checkbox-group">
               <label *ngFor="let permission of group.value" class="checkbox-label">
-                <input
-                  type="checkbox"
-                  [value]="permission.name"
+                <input type="checkbox" [value]="permission.name"
                   (change)="onPermissionChange($event, permission.name, 'edit')"
-                  [checked]="updateRoleForm.get('permissions')?.value?.includes(permission.name)"
-                />
+                  [checked]="updateRoleForm.get('permissions')?.value?.includes(permission.name)" />
                 <span>{{ permission.name | titlecase }}</span>
               </label>
             </div>
@@ -308,9 +270,9 @@
     <div class="modal-body">
       <div class="warning-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
       </div>
       <p>¿Estás seguro de que quieres eliminar el rol <strong>{{ selectedRole()?.name }}</strong>?</p>
