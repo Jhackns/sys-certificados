@@ -52,8 +52,8 @@ class GenerateCertificateJob implements ShouldQueue
         // Obtener el usuario
         $user = User::findOrFail($this->certificate->user_id);
 
-        // Generar URL para verificación
-        $verificationUrl = url("/verify/{$this->certificate->unique_code}");
+        // Generar URL para verificación (apuntando a qrserver como solicitó el usuario)
+        $verificationUrl = $this->certificate->getQrContentUrl();
 
         // Generar QR
         $qrRelativePath = $qrService->generateQRCodeFromUrl($verificationUrl);

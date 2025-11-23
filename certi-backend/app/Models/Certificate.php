@@ -177,4 +177,14 @@ class Certificate extends Model
         $this->increment('verification_count');
         $this->update(['last_verified_at' => now()]);
     }
+
+    /**
+     * Obtener URL para el contenido del QR (externo)
+     */
+    public function getQrContentUrl(): string
+    {
+        // Retorna una URL que muestra el código único como texto (en una imagen)
+        // Usamos dummyimage para mostrar el texto "CERT-XXXX" en una imagen blanca
+        return "https://dummyimage.com/600x400/ffffff/000000&text=" . urlencode($this->unique_code);
+    }
 }

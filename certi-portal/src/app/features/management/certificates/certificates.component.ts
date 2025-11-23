@@ -262,7 +262,7 @@ export class CertificatesComponent implements OnInit {
           this.users.set(items);
         }
       },
-      error: () => {}
+      error: () => { }
     });
 
     // Cargar actividades
@@ -273,7 +273,7 @@ export class CertificatesComponent implements OnInit {
           this.activities.set(items);
         }
       },
-      error: () => {}
+      error: () => { }
     });
 
     // Cargar plantillas
@@ -284,7 +284,7 @@ export class CertificatesComponent implements OnInit {
           this.templates.set(items);
         }
       },
-      error: () => {}
+      error: () => { }
     });
   }
 
@@ -458,7 +458,7 @@ export class CertificatesComponent implements OnInit {
             });
           }
         },
-        error: () => {}
+        error: () => { }
       });
     }
     this.certificateService.getCertificate(certificate.id).subscribe({
@@ -467,7 +467,7 @@ export class CertificatesComponent implements OnInit {
           this.selectedCertificate.set(detail.data.certificate);
         }
       },
-      error: () => {}
+      error: () => { }
     });
   }
 
@@ -576,10 +576,17 @@ export class CertificatesComponent implements OnInit {
     });
   }
 
+  // Signal to track which certificate is currently sending an email
+  sendingEmailId = signal<number | null>(null);
+
   // Método para enviar certificado por email
   sendCertificateEmail(id: number): void {
+    if (this.sendingEmailId()) return; // Prevent double clicks
+
+    this.sendingEmailId.set(id);
     this.certificateService.sendEmail(id).subscribe({
       next: (response: any) => {
+        this.sendingEmailId.set(null);
         if (response.success) {
           this.successMessage.set('Certificado enviado por correo electrónico.');
         } else {
@@ -587,6 +594,7 @@ export class CertificatesComponent implements OnInit {
         }
       },
       error: (error) => {
+        this.sendingEmailId.set(null);
         this.errorMessage.set('Error al enviar el certificado por correo electrónico.');
         console.error('Error sending certificate email:', error);
       }

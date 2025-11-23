@@ -377,8 +377,9 @@ class CertificateService
             // Generar URL de verificación
             $verificationUrl = $certificate->getVerificationUrl($verificationCode);
 
-            // Generar QR code
-            $qrImagePath = $this->qrCodeService->generateQRCode($certificate, $verificationUrl);
+            // Generar QR code usando la URL externa (qrserver)
+            $qrContentUrl = $certificate->getQrContentUrl();
+            $qrImagePath = $this->qrCodeService->generateQRCode($certificate, $qrContentUrl);
 
             // Preparar datos de validación
             $validationData = [

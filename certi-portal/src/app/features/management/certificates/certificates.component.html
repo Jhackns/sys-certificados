@@ -124,8 +124,10 @@
               <button class="btn-icon btn-download" (click)="openDownloadModal(certificate)" title="Descargar">
                 <i class="fas fa-download"></i>
               </button>
-              <button class="btn-icon btn-send" (click)="sendCertificateEmail(certificate.id)" title="Enviar por email">
-                <i class="fas fa-envelope"></i>
+              <button class="btn-icon btn-send" (click)="sendCertificateEmail(certificate.id)" title="Enviar por email"
+                [disabled]="sendingEmailId() === certificate.id">
+                <i class="fas fa-envelope" *ngIf="sendingEmailId() !== certificate.id"></i>
+                <i class="fas fa-spinner fa-spin" *ngIf="sendingEmailId() === certificate.id"></i>
               </button>
               <button class="btn-icon btn-edit" (click)="openEditModal(certificate)" title="Editar">
                 <i class="fas fa-edit"></i>
@@ -285,16 +287,7 @@
           </div>
         </div>
 
-        <!-- Vista previa de plantilla -->
-        <div class="template-preview-container" *ngIf="selectedTemplate()?.file_url">
-          <div class="template-preview-header">
-            <h5><i class="fas fa-image"></i> Vista previa de la plantilla</h5>
-          </div>
-          <div class="template-preview-content">
-            <app-template-preview [template]="selectedTemplate()" [maxWidth]="600" [maxHeight]="400"
-              [showElements]="true" [sampleUserName]="getUserNameForPreview()"></app-template-preview>
-          </div>
-        </div>
+        <!-- Vista previa de plantilla eliminada -->
       </div>
 
       <div class="modal-footer">
@@ -538,9 +531,11 @@
         <i class="fas fa-download"></i>
         Descargar
       </button>
-      <button type="button" class="btn btn-success" (click)="sendCertificateEmail(selectedCertificate()?.id || 0)">
-        <i class="fas fa-envelope"></i>
-        Enviar por Email
+      <button type="button" class="btn btn-success" (click)="sendCertificateEmail(selectedCertificate()?.id || 0)"
+        [disabled]="sendingEmailId() === selectedCertificate()?.id">
+        <i class="fas fa-envelope" *ngIf="sendingEmailId() !== selectedCertificate()?.id"></i>
+        <i class="fas fa-spinner fa-spin" *ngIf="sendingEmailId() === selectedCertificate()?.id"></i>
+        {{ sendingEmailId() === selectedCertificate()?.id ? 'Enviando...' : 'Enviar por Email' }}
       </button>
       <button type="button" class="btn btn-outline" (click)="closeModals()">
         <i class="fas fa-times"></i>
