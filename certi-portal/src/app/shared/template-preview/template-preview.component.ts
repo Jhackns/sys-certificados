@@ -57,6 +57,7 @@ export interface TemplatePreviewData {
           [style.font-size.px]="getNameFontSize()"
           [style.color]="getNameColor()"
           [style.font-family]="getNameFontFamily()"
+          [style.font-weight]="getNameFontWeight()"
           [style.transform]="'rotate(' + getNameRotation() + 'deg)'"
         >
           {{ getNameText() }}
@@ -71,6 +72,7 @@ export interface TemplatePreviewData {
           [style.font-size.px]="getDateFontSize()"
           [style.color]="getDateColor()"
           [style.font-family]="getDateFontFamily()"
+          [style.font-weight]="getDateFontWeight()"
           [style.transform]="'rotate(' + getDateRotation() + 'deg)'"
         >
           {{ getDateText() }}
@@ -123,9 +125,9 @@ export interface TemplatePreviewData {
     .qr-element { position: absolute; z-index: 5; transform-origin: top left; }
 
 
-    .name-element { position: absolute; white-space: nowrap; z-index: 5; transform-origin: top left; }
+    .name-element { position: absolute; white-space: nowrap; z-index: 5; transform-origin: top left; line-height: 1; }
 
-    .date-element { position: absolute; white-space: nowrap; z-index: 5; transform-origin: top left; }
+    .date-element { position: absolute; white-space: nowrap; z-index: 5; transform-origin: top left; line-height: 1; }
 
     .no-image-placeholder {
       display: flex;
@@ -320,27 +322,35 @@ export class TemplatePreviewComponent implements OnInit {
 
   private getScaleXNatural(): number {
     if (!this.imageLoaded()) return 1;
-    const base = Number(this.template?.background_image_size?.width || this.naturalW() || this.imageWidth());
+    const base = Number(this.template?.template_styles?.editor_canvas_size?.width || this.template?.background_image_size?.width || this.naturalW() || this.imageWidth());
     return base ? this.imageWidth() / base : 1;
   }
 
   private getScaleYNatural(): number {
     if (!this.imageLoaded()) return 1;
-    const base = Number(this.template?.background_image_size?.height || this.naturalH() || this.imageHeight());
+    const base = Number(this.template?.template_styles?.editor_canvas_size?.height || this.template?.background_image_size?.height || this.naturalH() || this.imageHeight());
     return base ? this.imageHeight() / base : 1;
   }
 
   private getBaseWidth(): number {
-    return Number(this.template?.background_image_size?.width || this.naturalW() || this.imageWidth());
+    return Number(this.template?.template_styles?.editor_canvas_size?.width || this.template?.background_image_size?.width || this.naturalW() || this.imageWidth());
   }
 
   private getBaseHeight(): number {
-    return Number(this.template?.background_image_size?.height || this.naturalH() || this.imageHeight());
+    return Number(this.template?.template_styles?.editor_canvas_size?.height || this.template?.background_image_size?.height || this.naturalH() || this.imageHeight());
   }
 
   private getCoordsOrigin(): 'center' | 'left-top' {
     const origin = String(this.template?.template_styles?.coords_origin || 'center').toLowerCase();
     return origin === 'left-top' ? 'left-top' : 'center';
+  }
+
+  getNameFontWeight(): string {
+    return this.template?.name_position?.fontWeight || 'normal';
+  }
+
+  getDateFontWeight(): string {
+    return this.template?.date_position?.fontWeight || 'normal';
   }
 
   getNameRotation(): number {

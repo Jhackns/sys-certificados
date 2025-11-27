@@ -282,9 +282,32 @@ export class TemplatesComponent implements OnInit {
     const reader = new FileReader();
     reader.onload = () => {
       this.uploadedPreviewUrl = reader.result as string;
+      this.hasBeenEdited = false; // Reset edited flag
       const img = new Image();
       img.onload = () => {
-        this.backgroundImageSize.set({ width: img.naturalWidth, height: img.naturalHeight });
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        this.backgroundImageSize.set({ width: w, height: h });
+
+        // Initialize default elements scaled to image size
+        // Standard reference width: 800px. If image is 2000px, scale is 2.5
+        const scale = w > 1000 ? w / 800 : 1;
+        const midX = Math.round(w / 2);
+        const midY = Math.round(h / 2);
+
+        this.editorElements.set([
+          {
+            type: 'name',
+            x: midX,
+            y: midY, // Center
+            fontFamily: 'Arial',
+            fontSize: 28,
+            color: '#000000',
+            fontWeight: 'bold',
+            rotation: 0
+          }
+        ]);
+        this.selectedElementIndex.set(0);
       };
       img.src = this.uploadedPreviewUrl as string;
     };
@@ -498,12 +521,31 @@ export class TemplatesComponent implements OnInit {
       formData.append('background_image_size[height]', String(bgSize.height));
     }
 
-    const canvasSize = this.editorCanvasSize();
+    // Determine effective canvas size (use background size if editor size is missing/unedited)
+    let canvasSize = this.editorCanvasSize();
+    if (!canvasSize && bgSize) {
+      canvasSize = { width: bgSize.width, height: bgSize.height };
+    }
+
     if (canvasSize) {
       formData.append('template_styles[editor_canvas_size][width]', String(Math.round(canvasSize.width)));
       formData.append('template_styles[editor_canvas_size][height]', String(Math.round(canvasSize.height)));
     }
     formData.append('template_styles[coords_origin]', 'center');
+    formData.append('template_styles[is_edited]', this.hasBeenEdited ? 'true' : 'false');
+
+    // Helper to compute center-relative coordinates using the EFFECTIVE canvas size
+    const computeRelative = (el: { x: number; y: number }) => {
+      if (canvasSize) {
+        const midX = Math.round(canvasSize.width / 2);
+        const midY = Math.round(canvasSize.height / 2);
+        return {
+          x: Math.round((el.x || 0) - midX),
+          y: Math.round((el.y || 0) - midY)
+        };
+      }
+      return { x: Math.round(el.x || 0), y: Math.round(el.y || 0) };
+    };
 
     // Incluir desplazamiento del fondo en estilos de plantilla
     const bgOffCreate = this.backgroundOffset();
@@ -518,7 +560,7 @@ export class TemplatesComponent implements OnInit {
     const dateEl = this.editorElements().find(el => el.type === 'date');
     const qrEl = this.editorElements().find(el => el.type === 'qr');
 
-    const namePosCreate = this.computeOriginAdjusted(nameEl!);
+    const namePosCreate = computeRelative(nameEl!);
     formData.append('name_position[x]', String(namePosCreate.x));
     formData.append('name_position[y]', String(namePosCreate.y));
     formData.append('name_position[left]', String(Math.round(nameEl.x)));
@@ -530,7 +572,7 @@ export class TemplatesComponent implements OnInit {
     formData.append('name_position[fontWeight]', String(nameEl.fontWeight || 'normal'));
 
     if (dateEl) {
-      const datePosCreate = this.computeOriginAdjusted(dateEl);
+      const datePosCreate = computeRelative(dateEl);
       formData.append('date_position[x]', String(datePosCreate.x));
       formData.append('date_position[y]', String(datePosCreate.y));
       formData.append('date_position[left]', String(Math.round(dateEl.x)));
@@ -543,7 +585,7 @@ export class TemplatesComponent implements OnInit {
     }
 
     if (qrEl) {
-      const qrPosCreate = this.computeOriginAdjusted(qrEl);
+      const qrPosCreate = computeRelative(qrEl);
       formData.append('qr_position[x]', String(qrPosCreate.x));
       formData.append('qr_position[y]', String(qrPosCreate.y));
       formData.append('qr_position[left]', String(Math.round(qrEl.x)));
@@ -568,6 +610,19 @@ export class TemplatesComponent implements OnInit {
             fd.append('background_image_size[height]', String(bgSz.height));
           }
           fd.append('template_styles[coords_origin]', 'center');
+          fd.append('template_styles[is_edited]', this.hasBeenEdited ? 'true' : 'false');
+
+          // Ensure editor_canvas_size is saved so coordinates have a reference
+          const canvasSz = this.editorCanvasSize();
+          if (canvasSz) {
+            fd.append('template_styles[editor_canvas_size][width]', String(Math.round(canvasSz.width)));
+            fd.append('template_styles[editor_canvas_size][height]', String(Math.round(canvasSz.height)));
+          }
+
+          // Append components list (CRITICAL: Missing this caused components to not render on unedited templates)
+          this.editorElements().forEach(el => {
+            fd.append('template_styles[components][]', el.type);
+          });
           const nameElUpd = this.editorElements().find(el => el.type === 'name');
           const dateElUpd = this.editorElements().find(el => el.type === 'date');
           const qrElUpd = this.editorElements().find(el => el.type === 'qr');
@@ -680,6 +735,7 @@ export class TemplatesComponent implements OnInit {
       formData.append('template_styles[editor_canvas_size][width]', String(existing.width));
       formData.append('template_styles[editor_canvas_size][height]', String(existing.height));
     }
+    formData.append('template_styles[is_edited]', this.hasBeenEdited ? 'true' : 'false');
 
     // Append components list
     this.editorElements().forEach(el => {
@@ -795,8 +851,18 @@ export class TemplatesComponent implements OnInit {
           const currentH = h;
 
           // Saved canvas size (from DB or previous edit)
-          const savedW = this.editorCanvasSize()?.width || 0;
-          const savedH = this.editorCanvasSize()?.height || 0;
+          let savedW = this.editorCanvasSize()?.width || 0;
+          let savedH = this.editorCanvasSize()?.height || 0;
+
+          // Fallback: If no saved size, use background image size (Natural dimensions)
+          // This handles the case where the template was just uploaded (coords are natural) but editorCanvasSize wasn't set yet.
+          if (savedW === 0) {
+            const bgSz = this.backgroundImageSize();
+            if (bgSz) {
+              savedW = bgSz.width;
+              savedH = bgSz.height;
+            }
+          }
 
           // Update current canvas size
           this.editorCanvasSize.set({ width: w, height: h });
@@ -879,12 +945,17 @@ export class TemplatesComponent implements OnInit {
     this.isDragging = false;
   }
 
+  // Flag to track if the template has been edited in the visual editor
+  hasBeenEdited = false;
+
   cancelEditor(): void {
     this.restoreState();
     this.closePositionEditor();
   }
 
   saveEditor(): void {
+    // Mark as edited
+    this.hasBeenEdited = true;
     // No guardamos en BD, solo cerramos. Los cambios quedan en los signals (editorElements, etc)
     // y se enviarán cuando el usuario haga clic en "Actualizar Plantilla" o "Crear Plantilla".
     this.successMessage.set('Posiciones listas. Recuerda guardar la plantilla para aplicar los cambios.');
