@@ -59,7 +59,7 @@ export class TemplatesComponent implements OnInit {
   backgroundImageSize = signal<{ width: number; height: number } | null>(null);
   editorCanvasSize = signal<{ width: number; height: number } | null>(null);
   showEditor = signal(false);
-  editorElements = signal<{ type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string }[]>([]);
+  editorElements = signal<{ type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string; fontWeight?: string }[]>([]);
   selectedElementIndex = signal<number | null>(null);
   availableFonts = signal<string[]>([]);
   private fallbackFonts: string[] = [
@@ -136,14 +136,23 @@ export class TemplatesComponent implements OnInit {
       return pos.y != null ? Number(pos.y) : null;
     };
 
-    const els: { type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string }[] = [];
+    const els: { type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string; fontWeight?: string }[] = [];
 
     const namePos = (full as any)?.name_position;
     if (namePos) {
       const x = getAbsX(namePos);
       const y = getAbsY(namePos);
       if (x != null && y != null) {
-        els.push({ type: 'name', x: Math.round(x), y: Math.round(y), fontFamily: String(namePos.fontFamily || 'Arial'), fontSize: Number(namePos.fontSize || 28), rotation: Number(namePos.rotation || 0), color: String(namePos.color || '#000') });
+        els.push({
+          type: 'name',
+          x: Math.round(x),
+          y: Math.round(y),
+          fontFamily: String(namePos.fontFamily || 'Arial'),
+          fontSize: Number(namePos.fontSize || 28),
+          rotation: Number(namePos.rotation || 0),
+          color: String(namePos.color || '#000'),
+          fontWeight: String(namePos.fontWeight || 'normal')
+        });
       }
     }
     const datePos = (full as any)?.date_position;
@@ -151,7 +160,16 @@ export class TemplatesComponent implements OnInit {
       const x = getAbsX(datePos);
       const y = getAbsY(datePos);
       if (x != null && y != null) {
-        els.push({ type: 'date', x: Math.round(x), y: Math.round(y), fontFamily: String(datePos.fontFamily || 'Arial'), fontSize: Number(datePos.fontSize || 16), rotation: Number(datePos.rotation || 0), color: String(datePos.color || '#333') });
+        els.push({
+          type: 'date',
+          x: Math.round(x),
+          y: Math.round(y),
+          fontFamily: String(namePos.fontFamily || 'Arial'), // Fallback to name font if missing? Or default Arial
+          fontSize: Number(datePos.fontSize || 16),
+          rotation: Number(datePos.rotation || 0),
+          color: String(datePos.color || '#333'),
+          fontWeight: String(datePos.fontWeight || 'normal')
+        });
       }
     }
     const qrPos = (full as any)?.qr_position;
@@ -509,6 +527,7 @@ export class TemplatesComponent implements OnInit {
     formData.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
     formData.append('name_position[color]', String(nameEl.color || '#000'));
     formData.append('name_position[rotation]', String(nameEl.rotation || 0));
+    formData.append('name_position[fontWeight]', String(nameEl.fontWeight || 'normal'));
 
     if (dateEl) {
       const datePosCreate = this.computeOriginAdjusted(dateEl);
@@ -520,6 +539,7 @@ export class TemplatesComponent implements OnInit {
       formData.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
       formData.append('date_position[color]', String(dateEl.color || '#333'));
       formData.append('date_position[rotation]', String(dateEl.rotation || 0));
+      formData.append('date_position[fontWeight]', String(dateEl.fontWeight || 'normal'));
     }
 
     if (qrEl) {
@@ -559,6 +579,7 @@ export class TemplatesComponent implements OnInit {
             fd.append('name_position[fontFamily]', String(nameElUpd.fontFamily || 'Arial'));
             fd.append('name_position[color]', String(nameElUpd.color || '#000'));
             fd.append('name_position[rotation]', String(nameElUpd.rotation || 0));
+            fd.append('name_position[fontWeight]', String(nameElUpd.fontWeight || 'normal'));
             fd.append('name_position[textAlign]', 'left');
           }
           if (dateElUpd) {
@@ -569,6 +590,7 @@ export class TemplatesComponent implements OnInit {
             fd.append('date_position[fontFamily]', String(dateElUpd.fontFamily || 'Arial'));
             fd.append('date_position[color]', String(dateElUpd.color || '#333'));
             fd.append('date_position[rotation]', String(dateElUpd.rotation || 0));
+            fd.append('date_position[fontWeight]', String(dateElUpd.fontWeight || 'normal'));
             fd.append('date_position[textAlign]', 'left');
           }
           if (qrElUpd) {
@@ -680,6 +702,7 @@ export class TemplatesComponent implements OnInit {
       formData.append('name_position[fontFamily]', String(nameEl.fontFamily || 'Arial'));
       formData.append('name_position[color]', String(nameEl.color || '#000'));
       formData.append('name_position[rotation]', String(nameEl.rotation || 0));
+      formData.append('name_position[fontWeight]', String(nameEl.fontWeight || 'normal'));
     }
 
     // Date (Optional)
@@ -693,6 +716,7 @@ export class TemplatesComponent implements OnInit {
       formData.append('date_position[fontFamily]', String(dateEl.fontFamily || 'Arial'));
       formData.append('date_position[color]', String(dateEl.color || '#333'));
       formData.append('date_position[rotation]', String(dateEl.rotation || 0));
+      formData.append('date_position[fontWeight]', String(dateEl.fontWeight || 'normal'));
     } else {
       formData.append('date_position', '');
     }
@@ -978,6 +1002,15 @@ export class TemplatesComponent implements OnInit {
     this.clampSelectedWithinCanvas();
   }
 
+  updateColor(event: Event): void {
+    const val = (event.target as HTMLInputElement).value;
+    const idx = this.selectedElementIndex();
+    if (idx === null) return;
+    const els = [...this.editorElements()];
+    els[idx] = { ...els[idx], color: val };
+    this.editorElements.set(els);
+  }
+
   startDrag(event: MouseEvent, index: number): void {
     this.selectElement(index);
     this.isDragging = true;
@@ -1086,6 +1119,15 @@ export class TemplatesComponent implements OnInit {
     return Math.round((el.y || 0) - (canvasRect.height / 2));
   }
 
+  updateFontWeight(): void {
+    const idx = this.selectedElementIndex();
+    if (idx === null) return;
+    const els = [...this.editorElements()];
+    const currentWeight = els[idx].fontWeight || 'normal';
+    els[idx] = { ...els[idx], fontWeight: currentWeight === 'bold' ? 'normal' : 'bold' };
+    this.editorElements.set(els);
+  }
+
   private getElementAsPos(type: 'name' | 'date' | 'qr'): any {
     const el = this.editorElements().find(e => e.type === type);
     if (!el) return null;
@@ -1103,9 +1145,11 @@ export class TemplatesComponent implements OnInit {
       fontSize: el.fontSize,
       fontFamily: el.fontFamily,
       color: el.color,
+      fontWeight: el.fontWeight || 'normal',
       rotation: el.rotation,
       textAlign: 'left'
     };
+
   }
 
   @HostListener('window:keydown', ['$event'])

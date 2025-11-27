@@ -319,12 +319,14 @@
             </button>
             <ng-container [ngSwitch]="el.type">
               <div *ngSwitchCase="'name'" class="text-element" [style.fontFamily]="el.fontFamily || 'Arial'"
-                [style.fontSize.px]="el.fontSize || 28" [style.color]="el.color || '#000'">
+                [style.fontSize.px]="el.fontSize || 28" [style.color]="el.color || '#000'"
+                [style.fontWeight]="el.fontWeight || 'normal'">
                 Nombres Completos
                 <span class="hint">Posiciona y ajusta fuente/estilo</span>
               </div>
               <div *ngSwitchCase="'date'" class="text-element" [style.fontFamily]="el.fontFamily || 'Arial'"
-                [style.fontSize.px]="el.fontSize || 16" [style.color]="el.color || '#333'">
+                [style.fontSize.px]="el.fontSize || 16" [style.color]="el.color || '#333'"
+                [style.fontWeight]="el.fontWeight || 'normal'">
                 Fecha de Emisión
               </div>
               <div *ngSwitchCase="'qr'" class="qr-element" [style.width.px]="el.width || 120"
@@ -339,28 +341,59 @@
       <!-- Panel de propiedades del elemento seleccionado -->
       <div class="editor-properties" *ngIf="selectedElementIndex() !== null">
         <h4>Propiedades del elemento</h4>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Coordenadas (relativas al centro)</label>
-            <div class="coords-inline">
-              <span>X: {{ getSelectedRelativeX() }}</span>
+        <div class="form-row" style="display: flex; gap: 12px; align-items: flex-end; grid-template-columns: none;">
+          <!-- Coordenadas -->
+          <div class="form-group" style="flex: 0 0 auto; min-width: 80px;">
+            <label>Posición</label>
+            <div class="coords-inline" style="font-size: 12px; padding: 10px 0;">
+              <span style="margin-right: 8px;">X: {{ getSelectedRelativeX() }}</span>
               <span>Y: {{ getSelectedRelativeY() }}</span>
             </div>
           </div>
-          <div class="form-group" *ngIf="!isSelectedType('qr')">
+
+          <!-- Fuente (solo si no es QR) -->
+          <!-- Fuente (solo si no es QR) -->
+          <div class="form-group" *ngIf="!isSelectedType('qr')" style="flex: 2;">
             <label>Fuente</label>
-            <select class="form-control" [value]="getSelected()?.fontFamily || ''" (change)="updateFontFamily($event)">
-              <option *ngFor="let font of availableFonts()" [value]="font">{{ font }}</option>
-            </select>
+            <div style="display: flex; gap: 8px;">
+              <select class="form-control" [value]="getSelected()?.fontFamily || ''" (change)="updateFontFamily($event)"
+                style="flex: 1;">
+                <option *ngFor="let font of availableFonts()" [value]="font">{{ font }}</option>
+              </select>
+              <button class="btn-bold" [class.active]="getSelected()?.fontWeight === 'bold'"
+                (click)="updateFontWeight()" title="Negrita">
+                <i class="fas fa-bold"></i>
+              </button>
+            </div>
           </div>
-          <div class="form-group">
+
+          <!-- Tamaño -->
+          <div class="form-group" style="flex: 0 0 80px;">
             <label>Tamaño</label>
             <input *ngIf="!isSelectedType('qr')" type="number" class="form-control" (input)="updateFontSize($event)"
-              [value]="getSelected()?.fontSize || 28" min="6" max="200">
+              [value]="getSelected()?.fontSize || 28" min="3" max="100">
             <input *ngIf="isSelectedType('qr')" type="number" class="form-control" (input)="updateQrSize($event)"
               [value]="getSelected()?.width || 120" min="20" max="1000">
           </div>
-          <div class="form-group">
+
+          <!-- Color (solo si no es QR) -->
+          <div class="form-group" *ngIf="!isSelectedType('qr')" style="flex: 0 0 auto;">
+            <label>Color</label>
+            <div class="color-picker-wrapper" title="Color de fuente" style="width: 70px;">
+              <div class="color-picker-btn" (click)="colorInput.click()">
+                <div class="color-icon-wrapper">
+                  <i class="fas fa-font font-icon"></i>
+                  <div class="color-bar" [style.backgroundColor]="getSelected()?.color || '#000000'"></div>
+                </div>
+                <i class="fas fa-caret-down dropdown-arrow"></i>
+              </div>
+              <input #colorInput type="color" class="hidden-color-input" [value]="getSelected()?.color || '#000000'"
+                (input)="updateColor($event)">
+            </div>
+          </div>
+
+          <!-- Rotación -->
+          <div class="form-group" style="flex: 1;">
             <label>Rotación</label>
             <input type="number" class="form-control" (input)="updateRotation($event)"
               [value]="getSelected()?.rotation || 0" min="-180" max="180">
