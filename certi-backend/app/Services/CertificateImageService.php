@@ -320,8 +320,13 @@ class CertificateImageService
     private function addNameToImage($image, string $name, array $position): void
     {
         try {
-            $x = $position['x'] ?? 100;
-            $y = $position['y'] ?? 100;
+            // Fix: Calculate visual padding scale based on image resolution vs editor defaults (800px)
+            // Editor padding is 10px (X) and 6px (Y) fixed. matches .text-element CSS
+            $scale = $image->width() / 800; // Estimación de escala visual
+            
+            $x = ($position['x'] ?? 100) + (10 * $scale);
+            $y = ($position['y'] ?? 100) + (6 * $scale);
+            
             $fontSize = $position['fontSize'] ?? 24;
             $fontFamily = $position['fontFamily'] ?? null;
             $fontWeight = $position['fontWeight'] ?? 'normal';
@@ -350,7 +355,8 @@ class CertificateImageService
                 'position' => $position,
                 'x' => $x,
                 'y' => $y,
-                'font_size' => $fontSize
+                'font_size' => $fontSize,
+                'scale_used' => $scale
             ]);
 
         } catch (\Exception $e) {
@@ -373,8 +379,11 @@ class CertificateImageService
     private function addDateToImage($image, string $dateText, array $position): void
     {
         try {
-            $x = $position['x'] ?? 100;
-            $y = $position['y'] ?? 100;
+            // Fix: Apply padding offset scaled
+            $scale = $image->width() / 800;
+            $x = ($position['x'] ?? 100) + (10 * $scale);
+            $y = ($position['y'] ?? 100) + (6 * $scale);
+            
             $fontSize = $position['fontSize'] ?? 16;
             $fontFamily = $position['fontFamily'] ?? null;
             $color = $position['color'] ?? '#333333';

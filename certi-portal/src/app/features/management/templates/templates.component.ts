@@ -301,9 +301,9 @@ export class TemplatesComponent implements OnInit {
             x: midX,
             y: midY, // Center
             fontFamily: 'Arial',
-            fontSize: Math.round(28 * scale),
+            fontSize: Math.round(18 * scale),
             color: '#000000',
-            fontWeight: 'bold',
+            fontWeight: 'normal',
             rotation: 0
           }
         ]);
@@ -929,7 +929,19 @@ export class TemplatesComponent implements OnInit {
             const newX = el.x * scaleX;
             const newY = el.y * scaleY;
 
-            return { ...el, x: Math.round(newX), y: Math.round(newY) };
+            // Fix: Scale fontSize and dimensions so high-res default elements don't look huge on small editor canvas
+            const newFontSize = el.fontSize ? Math.round(el.fontSize * ((scaleX + scaleY) / 2)) : undefined;
+            const newWidth = el.width ? Math.round(el.width * scaleX) : undefined;
+            const newHeight = el.height ? Math.round(el.height * scaleY) : undefined;
+
+            return {
+              ...el,
+              x: Math.round(newX),
+              y: Math.round(newY),
+              ...(newFontSize !== undefined && { fontSize: newFontSize }),
+              ...(newWidth !== undefined && { width: newWidth }),
+              ...(newHeight !== undefined && { height: newHeight })
+            };
           });
 
           this.editorElements.set(els2);
@@ -1003,7 +1015,8 @@ export class TemplatesComponent implements OnInit {
     const canvasRect = this.getCanvasRect();
     const x = center ? Math.round(canvasRect.width / 2) : 40; // top-left anclado en centro => coords relativas 0,0
     const y = center ? Math.round(canvasRect.height / 2) : 40;
-    const el = { type: 'name' as const, x, y, fontFamily: 'Arial', fontSize: 28, rotation: 0, color: '#000' };
+    // Reduce default font size to 22 as requested (was 28)
+    const el = { type: 'name' as const, x, y, fontFamily: 'Arial', fontSize: 22, rotation: 0, color: '#000' };
     this.editorElements.set([...this.editorElements(), el]);
     this.selectedElementIndex.set(this.editorElements().length - 1);
   }
