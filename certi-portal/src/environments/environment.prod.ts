@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://tu-dominio.com/api',
+  apiUrl: 'http://localhost:8000/api',
   appName: 'Sistema de Certificados'
 };

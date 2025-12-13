@@ -301,7 +301,7 @@ export class TemplatesComponent implements OnInit {
             x: midX,
             y: midY, // Center
             fontFamily: 'Arial',
-            fontSize: 28,
+            fontSize: Math.round(28 * scale),
             color: '#000000',
             fontWeight: 'bold',
             rotation: 0
@@ -521,10 +521,13 @@ export class TemplatesComponent implements OnInit {
       formData.append('background_image_size[height]', String(bgSize.height));
     }
 
-    // Determine effective canvas size (use background size if editor size is missing/unedited)
+    // Determine effective canvas size
+    // CRITICAL: If editor wasn't opened (unedited), elements are positioned based on 
+    // the default virtual canvas (800x600). We MUST use this size as the reference 
+    // for the backend to scale coordinates/fonts correctly to the high-res background.
     let canvasSize = this.editorCanvasSize();
-    if (!canvasSize && bgSize) {
-      canvasSize = { width: bgSize.width, height: bgSize.height };
+    if (!canvasSize) {
+      canvasSize = { width: 800, height: 600 };
     }
 
     if (canvasSize) {
@@ -613,10 +616,9 @@ export class TemplatesComponent implements OnInit {
           fd.append('template_styles[is_edited]', this.hasBeenEdited ? 'true' : 'false');
 
           // Ensure editor_canvas_size is saved so coordinates have a reference
-          const canvasSz = this.editorCanvasSize();
-          if (canvasSz) {
-            fd.append('template_styles[editor_canvas_size][width]', String(Math.round(canvasSz.width)));
-            fd.append('template_styles[editor_canvas_size][height]', String(Math.round(canvasSz.height)));
+          if (canvasSize) {
+            fd.append('template_styles[editor_canvas_size][width]', String(Math.round(canvasSize.width)));
+            fd.append('template_styles[editor_canvas_size][height]', String(Math.round(canvasSize.height)));
           }
 
           // Append components list (CRITICAL: Missing this caused components to not render on unedited templates)
@@ -627,9 +629,13 @@ export class TemplatesComponent implements OnInit {
           const dateElUpd = this.editorElements().find(el => el.type === 'date');
           const qrElUpd = this.editorElements().find(el => el.type === 'qr');
           if (nameElUpd) {
-            const namePosUpd = this.computeOriginAdjusted(nameElUpd);
+            // Usar computeRelative (local con fallback) en lugar de computeOriginAdjusted
+            const namePosUpd = computeRelative(nameElUpd);
             fd.append('name_position[x]', String(namePosUpd.x));
             fd.append('name_position[y]', String(namePosUpd.y));
+            // CRITICAL: Send absolute coordinates (left/top) to ensure backend uses them directly
+            fd.append('name_position[left]', String(Math.round(nameElUpd.x)));
+            fd.append('name_position[top]', String(Math.round(nameElUpd.y)));
             fd.append('name_position[fontSize]', String(nameElUpd.fontSize || 28));
             fd.append('name_position[fontFamily]', String(nameElUpd.fontFamily || 'Arial'));
             fd.append('name_position[color]', String(nameElUpd.color || '#000'));
@@ -638,9 +644,12 @@ export class TemplatesComponent implements OnInit {
             fd.append('name_position[textAlign]', 'left');
           }
           if (dateElUpd) {
-            const datePosUpd = this.computeOriginAdjusted(dateElUpd);
+            const datePosUpd = computeRelative(dateElUpd);
             fd.append('date_position[x]', String(datePosUpd.x));
             fd.append('date_position[y]', String(datePosUpd.y));
+            // CRITICAL: Send absolute coordinates
+            fd.append('date_position[left]', String(Math.round(dateElUpd.x)));
+            fd.append('date_position[top]', String(Math.round(dateElUpd.y)));
             fd.append('date_position[fontSize]', String(dateElUpd.fontSize || 16));
             fd.append('date_position[fontFamily]', String(dateElUpd.fontFamily || 'Arial'));
             fd.append('date_position[color]', String(dateElUpd.color || '#333'));
@@ -649,9 +658,12 @@ export class TemplatesComponent implements OnInit {
             fd.append('date_position[textAlign]', 'left');
           }
           if (qrElUpd) {
-            const qrPosUpd = this.computeOriginAdjusted(qrElUpd);
+            const qrPosUpd = computeRelative(qrElUpd);
             fd.append('qr_position[x]', String(qrPosUpd.x));
             fd.append('qr_position[y]', String(qrPosUpd.y));
+            // CRITICAL: Send absolute coordinates
+            fd.append('qr_position[left]', String(Math.round(qrElUpd.x)));
+            fd.append('qr_position[top]', String(Math.round(qrElUpd.y)));
             fd.append('qr_position[width]', String(qrElUpd.width || 120));
             fd.append('qr_position[height]', String(qrElUpd.height || 120));
             fd.append('qr_position[rotation]', String(qrElUpd.rotation || 0));

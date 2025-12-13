@@ -524,57 +524,30 @@
       </div>
 
       <!-- Vista previa del certificado -->
+      <!-- Vista previa del certificado -->
       <div class="certificate-preview-section">
-        <!-- 1. Si existe la imagen generada (fusionada) Y la plantilla NO está marcada explícitamente como no editada, mostrarla.
-             Esto cubre:
-             - Plantillas editadas nuevas (is_edited = 'true')
-             - Plantillas antiguas (is_edited = undefined)
-             - EXCLUYE: Plantillas no editadas nuevas (is_edited = 'false') -->
-        <div class="certificate-preview"
-          *ngIf="certificatePreview() && selectedTemplate()?.template_styles?.is_edited !== 'false'; else templateSimulation">
+        <!-- Mostrar SIEMPRE la imagen generada por el backend (o la captura si existe) -->
+        <div class="certificate-preview" *ngIf="certificatePreview(); else templateSimulation">
           <img [src]="certificatePreview()" [alt]="'Certificado de ' + selectedCertificate()?.user?.name"
             class="certificate-img"
             style="width: 100%; height: auto; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 4px;" />
           <div class="mt-2 text-center">
-            <small class="text-success"><i class="fas fa-check-circle"></i> Visualizando certificado generado (Imagen
-              Final)</small>
+            <small class="text-success"><i class="fas fa-check-circle"></i> Visualizando certificado generado</small>
           </div>
         </div>
 
-        <!-- 2. Si no, mostrar simulación con plantilla (capas HTML) -->
+        <!-- Fallback: Simulación con plantilla (solo si no hay imagen de backend) -->
         <ng-template #templateSimulation>
-          <div class="certificate-preview" *ngIf="selectedTemplate()?.file_url; else noCertificatePreview">
-            <div class="alert alert-info mb-2">
-              <i class="fas fa-info-circle"></i> Vista preliminar (simulación). El certificado final puede variar
-              ligeramente.
-            </div>
+          <div class="certificate-preview-content" *ngIf="selectedTemplate()?.file_url; else noCertificatePreview">
+            <!-- Esta sección será capturada por html2canvas si falla el backend -->
             <app-template-preview [template]="selectedTemplate()" [maxWidth]="720" [maxHeight]="480"
               [showElements]="true" [sampleUserName]="selectedCertificate()?.user?.name || 'Usuario'"
               [qrUrl]="getQrPreviewUrl()"
               [sampleDate]="formatDate(selectedCertificate()?.fecha_emision)"></app-template-preview>
-            <div class="component-coords">
-              <div class="coords-grid">
-                <div class="coords-col">
-                  <h6><i class="fas fa-crosshairs"></i> Coordenadas</h6>
-                  <div class="coord-row"><span class="label">Nombre:</span><span>x = {{ getNameCoordX() }}, y = {{
-                      getNameCoordY() }}</span></div>
-                  <div class="coord-row"><span class="label">Fecha:</span><span>x = {{ getDateCoordX() }}, y = {{
-                      getDateCoordY() }}</span></div>
-                  <div class="coord-row"><span class="label">QR:</span><span>x = {{ getQrCoordX() }}, y = {{
-                      getQrCoordY() }}</span></div>
-                </div>
-                <div class="coords-col">
-                  <h6><i class="fas fa-text-height"></i> Tamaños</h6>
-                  <div class="coord-row"><span class="label">Nombre:</span><span>{{ getNameSize() }}</span></div>
-                  <div class="coord-row"><span class="label">Fecha:</span><span>{{ getDateSize() }}</span></div>
-                  <div class="coord-row"><span class="label">QR:</span><span>{{ getQrSizeValue() }}</span></div>
-                </div>
-              </div>
-            </div>
           </div>
         </ng-template>
 
-        <!-- 3. Estado de carga o error -->
+        <!-- Estado de carga o error -->
         <ng-template #noCertificatePreview>
           <div class="no-preview">
             <i class="fas fa-file-pdf"></i>

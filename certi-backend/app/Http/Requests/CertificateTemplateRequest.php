@@ -74,6 +74,8 @@ class CertificateTemplateRequest extends FormRequest
             'template_styles.editor_canvas_size' => 'sometimes|array',
             'template_styles.editor_canvas_size.width' => 'required_with:template_styles.editor_canvas_size|numeric',
             'template_styles.editor_canvas_size.height' => 'required_with:template_styles.editor_canvas_size|numeric',
+            'template_styles.components' => 'sometimes|array',
+            'template_styles.components.*' => 'string',
         ];
 
         // Para actualizaciones, hacer todos los campos opcionales pero requeridos si se proporcionan

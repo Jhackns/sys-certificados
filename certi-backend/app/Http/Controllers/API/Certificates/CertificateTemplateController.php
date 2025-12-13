@@ -208,7 +208,16 @@ class CertificateTemplateController extends Controller
                 if ($size) {
                     $data['background_image_size'] = [ 'width' => $size[0], 'height' => $size[1] ];
                 }
+                if ($size) {
+                    $data['background_image_size'] = [ 'width' => $size[0], 'height' => $size[1] ];
+                }
             }
+            
+            Log::info('Datos preparados para crear plantilla', [
+                'name' => $data['name'],
+                'template_styles_keys' => isset($data['template_styles']) ? array_keys($data['template_styles']) : [],
+                'components' => $data['template_styles']['components'] ?? 'MISSING'
+            ]);
 
             // Crear la plantilla
             $template = $this->templateService->create($data);

@@ -329,14 +329,8 @@ class CertificateImageService
             $align = strtolower($position['textAlign'] ?? 'left');
             $vAlign = strtolower($position['verticalAlign'] ?? 'top');
             $rotation = (float)($position['rotation'] ?? 0);
-            $fontPath = $fontFamily ? $this->getFontVariantPath($fontFamily, $fontWeight, null) : null;
-            $bbox = $this->measureTextBBoxRotated($name, (int)$fontSize, $fontPath, $rotation);
-            $xs = [$bbox['min_x'] ?? 0, $bbox['max_x'] ?? 0];
-            $ys = [$bbox['min_y'] ?? 0, $bbox['max_y'] ?? 0];
-            $widthPx = $bbox['width'] ?? 0;
-            $xDraw = $x - (int)round($bbox['min_x'] ?? 0);
-            $yDraw = $y - (int)round($bbox['min_y'] ?? 0);
-            $image->text($name, $xDraw, $yDraw, function ($font) use ($fontSize, $fontFamily, $fontWeight, $color, $rotation) {
+            
+            $image->text($name, $x, $y, function ($font) use ($fontSize, $fontFamily, $fontWeight, $color, $rotation, $align, $vAlign) {
                 $font->size($fontSize);
                 $font->color($color);
                 $fontPath = $fontFamily ? $this->getFontVariantPath($fontFamily, $fontWeight, null) : null;
@@ -346,24 +340,17 @@ class CertificateImageService
                 if (abs($rotation) > 0.01) {
                     $font->angle($rotation);
                 }
+                // Usar alineación explícita acorde al frontend (Top/Left por defecto)
+                $font->align($align === 'center' ? 'center' : ($align === 'right' ? 'right' : 'left'));
+                $font->valign($vAlign === 'middle' ? 'middle' : ($vAlign === 'bottom' ? 'bottom' : 'top'));
             });
 
-            $fontPathApplied = $fontFamily ? $this->getFontVariantPath($fontFamily, $fontWeight, null) : null;
             Log::info('Nombre añadido a la imagen del certificado', [
                 'name' => $name,
                 'position' => $position,
-                'align' => $align,
-                'vertical_align' => $vAlign,
-                'x_expected' => $x,
-                'x_drawn' => $xDraw,
-                'text_width_px' => $widthPx,
-                'y_expected' => $y,
-                'y_drawn' => $yDraw,
-                'bbox' => $bbox,
-                'font_family' => $fontFamily,
-                'font_weight' => $fontWeight,
-                'font_size_px' => $fontSize,
-                'font_path_applied' => $fontPathApplied
+                'x' => $x,
+                'y' => $y,
+                'font_size' => $fontSize
             ]);
 
         } catch (\Exception $e) {
@@ -395,12 +382,8 @@ class CertificateImageService
             $vAlign = strtolower($position['verticalAlign'] ?? 'top');
             $fontWeight = $position['fontWeight'] ?? 'normal';
             $rotation = (float)($position['rotation'] ?? 0);
-            $fontPath = $fontFamily ? $this->getFontVariantPath($fontFamily, $fontWeight, null) : null;
-            $bbox = $this->measureTextBBoxRotated($dateText, (int)$fontSize, $fontPath, $rotation);
-            $widthPx = $bbox['width'] ?? 0;
-            $xDraw = $x - (int)round($bbox['min_x'] ?? 0);
-            $yDraw = $y - (int)round($bbox['min_y'] ?? 0);
-            $image->text($dateText, $xDraw, $yDraw, function ($font) use ($fontSize, $fontFamily, $fontWeight, $color, $rotation) {
+            
+            $image->text($dateText, $x, $y, function ($font) use ($fontSize, $fontFamily, $fontWeight, $color, $rotation, $align, $vAlign) {
                 $font->size($fontSize);
                 $font->color($color);
                 $fontPath = $fontFamily ? $this->getFontVariantPath($fontFamily, $fontWeight, null) : null;
@@ -410,24 +393,16 @@ class CertificateImageService
                 if (abs($rotation) > 0.01) {
                     $font->angle($rotation);
                 }
+                $font->align($align === 'center' ? 'center' : ($align === 'right' ? 'right' : 'left'));
+                $font->valign($vAlign === 'middle' ? 'middle' : ($vAlign === 'bottom' ? 'bottom' : 'top'));
             });
 
-            $fontPathApplied = $fontFamily ? $this->getFontVariantPath($fontFamily, $fontWeight, null) : null;
             Log::info('Fecha añadida a la imagen del certificado', [
                 'date' => $dateText,
                 'position' => $position,
-                'align' => $align,
-                'vertical_align' => $vAlign,
-                'x_expected' => $x,
-                'x_drawn' => $xDraw,
-                'text_width_px' => $widthPx,
-                'y_expected' => $y,
-                'y_drawn' => $yDraw,
-                'bbox' => $bbox,
-                'font_family' => $fontFamily,
-                'font_weight' => $fontWeight,
-                'font_size_px' => $fontSize,
-                'font_path_applied' => $fontPathApplied
+                'x' => $x,
+                'y' => $y,
+                'font_size' => $fontSize
             ]);
         } catch (\Exception $e) {
             Log::error('Error al añadir fecha a la imagen', [

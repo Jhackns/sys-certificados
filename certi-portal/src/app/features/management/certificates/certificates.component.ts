@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { CertificateService } from './certificate.service';
 import { environment } from '../../../../environments/environment';
 import { TemplatePreviewComponent } from '../../../shared/template-preview/template-preview.component';
+import html2canvas from 'html2canvas';
 
 interface Certificate {
   id: number;
@@ -317,6 +318,35 @@ export class CertificatesComponent implements OnInit {
 
   // Métodos para manejar modales
 
+  generatedImage = signal<string | null>(null);
+
+  // Generate certificate image (Auto-capture)
+  async generateCertificateImage(): Promise<void> {
+    // Try to find visible preview first, then hidden target
+    let element = document.querySelector('.certificate-preview-content') as HTMLElement;
+    if (!element || element.offsetParent === null) {
+      element = document.getElementById('certificate-capture-target') as HTMLElement;
+    }
+
+    if (!element) return;
+
+    try {
+      // Wait a moment for hidden container to render if it was just added
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const canvas = await html2canvas(element, {
+        scale: 2, // Higher quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const dataUrl = canvas.toDataURL('image/png');
+      this.generatedImage.set(dataUrl);
+    } catch (error) {
+      console.error('Error generating certificate image:', error);
+    }
+  }
   openCreateModal(): void {
     // Reset con valores por defecto para evitar fallo en primer clic
     this.createForm.reset({
@@ -409,13 +439,35 @@ export class CertificatesComponent implements OnInit {
   }
 
   // Descargar certificado en formato específico
-  downloadCertificateFormat(format: 'pdf' | 'jpg'): void {
+  async downloadCertificateFormat(format: 'pdf' | 'jpg'): Promise<void> {
     const certificate = this.selectedCertificate();
     if (!certificate) return;
 
     this.isLoading.set(true);
 
-    // Llamar al servicio con el formato específico
+    if (format === 'jpg') {
+      // Use generated image if available
+      let dataUrl = this.generatedImage();
+
+      if (!dataUrl) {
+        // Try to generate on the fly
+        await this.generateCertificateImage();
+        dataUrl = this.generatedImage();
+      }
+
+      if (dataUrl) {
+        const link = document.createElement('a');
+        link.download = `certificado_${certificate.unique_code}.png`;
+        link.href = dataUrl;
+        link.click();
+        this.isLoading.set(false);
+        this.successMessage.set('Certificado descargado (Captura)');
+        this.closeModals();
+        return;
+      }
+    }
+
+    // Fallback to backend download (PDF or if capture failed)
     this.certificateService.downloadCertificateFormat(certificate.id, format).subscribe({
       next: (blob) => {
         this.isLoading.set(false);
@@ -464,14 +516,16 @@ export class CertificatesComponent implements OnInit {
   openViewModal(certificate: Certificate): void {
     this.selectedCertificate.set(certificate);
     this.showViewModal.set(true);
-    // Cargar vista previa automáticamente
+    this.generatedImage.set(null); // Reset previous capture
+
+    // Cargar vista previa automáticamente (Backend URL)
     this.loadCertificatePreview(certificate.id);
-    // Reintentar si aún se está generando en background
+
+    // Trigger auto-capture
     setTimeout(() => {
-      if (!this.certificatePreview()) {
-        this.loadCertificatePreview(certificate.id);
-      }
-    }, 1500);
+      this.generateCertificateImage();
+    }, 1000); // Wait for template to render
+
     const tplId = certificate.template?.id;
     if (tplId) {
       this.http.get<any>(`${environment.apiUrl}/certificate-templates/${tplId}`).subscribe({
@@ -498,6 +552,8 @@ export class CertificatesComponent implements OnInit {
       next: (detail) => {
         if (detail?.data?.certificate) {
           this.selectedCertificate.set(detail.data.certificate);
+          // Re-trigger capture with full details
+          setTimeout(() => this.generateCertificateImage(), 500);
         }
       },
       error: () => { }
