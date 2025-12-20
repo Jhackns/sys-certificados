@@ -246,8 +246,8 @@ class CertificateImageService
             }
             skip_qr_overlay:
 
-            // Generar nombre único para la imagen final
-            $finalImageName = 'certificates/final/' . $certificate->id . '_' . time() . '.png';
+            // Generar nombre único para la imagen final en carpeta temporal
+            $finalImageName = 'temp/' . $certificate->id . '_' . time() . '.png';
             $finalImagePath = storage_path('app/public/' . $finalImageName);
 
             // Crear directorio si no existe
@@ -259,7 +259,7 @@ class CertificateImageService
             // Guardar la imagen final
             $image->save($finalImagePath);
 
-            Log::info('Imagen final del certificado generada exitosamente', [
+            Log::info('Imagen final del certificado generada exitosamente en temp', [
                 'certificate_id' => $certificate->id,
                 'final_image_path' => $finalImageName,
                 'background_offset' => ['x' => $offsetX, 'y' => $offsetY]
@@ -753,94 +753,143 @@ class CertificateImageService
     /**
      * Obtener ruta de fuente considerando variantes de peso/estilo
      */
+    /**
+     * Obtener ruta de fuente considerando variantes de peso/estilo
+     */
     private function getFontVariantPath(string $fontFamily, ?string $fontWeight, ?string $fontStyle): ?string
     {
         $weight = strtolower($fontWeight ?? 'normal');
         $style = strtolower($fontStyle ?? 'normal');
-        $family = strtolower($fontFamily);
-
-        // Calcular clave de variante
-        $key = $weight === 'bold' && $style === 'italic' ? 'bolditalic' : ($weight === 'bold' ? 'bold' : ($style === 'italic' ? 'italic' : 'normal'));
-
-        // Preferir en storage/fonts
-        $storageFonts = [
-            $family . ($key === 'normal' ? '' : '-' . $key) . '.ttf',
-            $family . ($key === 'normal' ? '' : '-' . $key) . '.otf',
-            $family . '.ttf',
-            $family . '.otf',
+        $originalFamily = trim($fontFamily);
+        
+        // Normalizar nombre de familia para búsqueda de directorios (Great Vibes -> Great_Vibes)
+        // Intentar ambas variantes: con espacios y con guiones bajos
+        $familyCandidates = [
+            $originalFamily,
+            str_replace(' ', '_', $originalFamily),
+            str_replace(' ', '-', $originalFamily),
+            str_replace([' ', '-'], '_', $originalFamily),
+            preg_replace('/[^a-zA-Z0-9]/', '', $originalFamily) // GreatVibes
         ];
-        foreach ($storageFonts as $fname) {
-            $path1 = storage_path('app/fonts/' . $fname);
-            if (file_exists($path1)) return $path1;
-            $path2 = storage_path('app/public/fonts/' . $fname);
-            if (file_exists($path2)) return $path2;
-        }
+        $familyCandidates = array_unique($familyCandidates);
 
-        // Intentar variantes comunes en Windows
-        $winFonts = [
-            'arial' => [
-                'normal' => 'C:\\Windows\\Fonts\\arial.ttf',
-                'bold' => 'C:\\Windows\\Fonts\\arialbd.ttf',
-                'italic' => 'C:\\Windows\\Fonts\\ariali.ttf',
-                'bolditalic' => 'C:\\Windows\\Fonts\\arialbi.ttf',
-            ],
-            'comic sans ms' => [
-                'normal' => 'C:\\Windows\\Fonts\\comic.ttf',
-                'bold' => 'C:\\Windows\\Fonts\\comicbd.ttf',
-                'italic' => 'C:\\Windows\\Fonts\\comici.ttf',
-                'bolditalic' => 'C:\\Windows\\Fonts\\comicbi.ttf',
-            ],
-            'courier new' => [
-                'normal' => 'C:\\Windows\\Fonts\\cour.ttf',
-                'bold' => 'C:\\Windows\\Fonts\\courbd.ttf',
-                'italic' => 'C:\\Windows\\Fonts\\couri.ttf',
-                'bolditalic' => 'C:\\Windows\\Fonts\\courbi.ttf',
-            ],
-            'calibri' => [
-                'normal' => 'C:\\Windows\\Fonts\\calibri.ttf',
-                'bold' => 'C:\\Windows\\Fonts\\calibrib.ttf',
-                'italic' => 'C:\\Windows\\Fonts\\calibrii.ttf',
-                'bolditalic' => 'C:\\Windows\\Fonts\\calibriz.ttf',
-            ],
-            'georgia' => [
-                'normal' => 'C:\\Windows\\Fonts\\georgia.ttf',
-                'bold' => 'C:\\Windows\\Fonts\\georgiab.ttf',
-                'italic' => 'C:\\Windows\\Fonts\\georgiai.ttf',
-                'bolditalic' => 'C:\\Windows\\Fonts\\georgiaz.ttf',
-            ],
-            'times new roman' => [
-                'normal' => 'C:\\Windows\\Fonts\\times.ttf',
-                'bold' => 'C:\\Windows\\Fonts\\timesbd.ttf',
-                'italic' => 'C:\\Windows\\Fonts\\timesi.ttf',
-                'bolditalic' => 'C:\\Windows\\Fonts\\timesbi.ttf',
-            ],
-            'times' => [
-                'normal' => 'C:\\Windows\\Fonts\\times.ttf',
-                'bold' => 'C:\\Windows\\Fonts\\timesbd.ttf',
-                'italic' => 'C:\\Windows\\Fonts\\timesi.ttf',
-                'bolditalic' => 'C:\\Windows\\Fonts\\timesbi.ttf',
-            ],
-            'courier' => [
-                'normal' => 'C:\\Windows\\Fonts\\cour.ttf',
-                'bold' => 'C:\\Windows\\Fonts\\courbd.ttf',
-                'italic' => 'C:\\Windows\\Fonts\\couri.ttf',
-                'bolditalic' => 'C:\\Windows\\Fonts\\courbi.ttf',
-            ],
-            'verdana' => [
-                'normal' => 'C:\\Windows\\Fonts\\verdana.ttf',
-                'bold' => 'C:\\Windows\\Fonts\\verdanab.ttf',
-                'italic' => 'C:\\Windows\\Fonts\\verdanai.ttf',
-                'bolditalic' => 'C:\\Windows\\Fonts\\verdanaz.ttf',
-            ],
+        // Directorios base a escanear
+        $baseDirs = [
+            public_path('fonts'),
+            storage_path('app/public/fonts'),
+            storage_path('app/fonts')
         ];
-        if (isset($winFonts[$family][$key]) && file_exists($winFonts[$family][$key])) {
-            return $winFonts[$family][$key];
-        }
 
+        // Determinar sufijos buscados según peso/estilo
+        // Ej: Bold Italic -> ["BoldItalic", "Bold-Italic", "Bold Italic", "Bi", "z", "Bold", "Italic"]
+        $suffixes = [];
+        $isBold = str_contains($weight, 'bold') || $weight === '700' || $weight === '800' || $weight === '900';
+        $isItalic = $style === 'italic';
+        
+        if ($isBold && $isItalic) {
+            $suffixes = ['BoldItalic', 'Bold-Italic', 'Bold_Italic', 'Bold Italic', 'Bi', 'z', '-BoldItalic'];
+        } elseif ($isBold) {
+            $suffixes = ['Bold', '-Bold', '_Bold', 'b', 'Bd'];
+        } elseif ($isItalic) {
+            $suffixes = ['Italic', '-Italic', '_Italic', 'i', 'It'];
+        } else {
+            $suffixes = ['Regular', '-Regular', '_Regular', 'Roman', 'Normal', ''];
+        }
+        // Fallbacks
+        $suffixes[] = 'Regular';
+        $suffixes[] = '';
+
+        foreach ($baseDirs as $baseDir) {
+            if (!is_dir($baseDir)) continue;
+            
+            // 1. Buscar carpeta de familia
+            foreach ($familyCandidates as $famName) {
+                $famDir = $baseDir . DIRECTORY_SEPARATOR . $famName;
+                if (is_dir($famDir)) {
+                    // Buscar dentro de la carpeta (y subcarpeta static si existe)
+                    $searchDirs = [$famDir];
+                    if (is_dir($famDir . DIRECTORY_SEPARATOR . 'static')) {
+                        array_unshift($searchDirs, $famDir . DIRECTORY_SEPARATOR . 'static');
+                    }
+                    
+                    foreach ($searchDirs as $searchDir) {
+                        // Obtener todos los archivos de fuente una sola vez para filtrar en memoria (más rápido y seguro sin GLOB_BRACE)
+                        $allFiles = array_merge(
+                            glob($searchDir . '/*.ttf') ?: [],
+                            glob($searchDir . '/*.otf') ?: []
+                        );
+                        
+                        foreach ($suffixes as $suffix) {
+                            if ($suffix === '') {
+                                // Búsqueda de archivo base (Family.ttf)
+                                $filePatterns = [
+                                    $famName . '.ttf',
+                                    $originalFamily . '.ttf',
+                                    str_replace(' ', '', $originalFamily) . '.ttf',
+                                ];
+                            } else {
+                                // Búsqueda con sufijo (Family-Bold.ttf)
+                                $filePatterns = [
+                                    $famName . '-' . $suffix . '.ttf',
+                                    $famName . $suffix . '.ttf',
+                                    $originalFamily . '-' . $suffix . '.ttf',
+                                    str_replace(' ', '', $originalFamily) . '-' . $suffix . '.ttf',
+                                    str_replace(' ', '', $originalFamily) . $suffix . '.ttf',
+                                ];
+                            }
+                            
+                            foreach ($filePatterns as $pattern) {
+                                $path = $searchDir . DIRECTORY_SEPARATOR . $pattern;
+                                if (file_exists($path)) {
+                                    Log::info("Fuente encontrada (exacta): " . basename($path) . " para $fontFamily $weight");
+                                    return $path;
+                                }
+                                $pathOtf = str_replace('.ttf', '.otf', $path);
+                                if (file_exists($pathOtf)) return $pathOtf;
+                            }
+                            
+                            // Búsqueda aproximada en lista de archivos (solo si tenemos sufijo no vacío)
+                            if ($suffix !== '') {
+                                foreach ($allFiles as $file) {
+                                    $basename = basename($file);
+                                    if (stripos($basename, $suffix) !== false) {
+                                        Log::info("Fuente encontrada (aprox): $basename para $fontFamily $weight con sufijo $suffix");
+                                        return $file;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Si se pidió Regular o fallback implícito
+                        if (empty($fontWeight) || $fontWeight === 'normal' || in_array('Regular', $suffixes)) {
+                             foreach ($allFiles as $file) {
+                                 if (stripos(basename($file), 'Regular') !== false || stripos(basename($file), 'Normal') !== false) {
+                                     return $file;
+                                 }
+                             }
+                        }
+                    }
+                    
+                    // Si llegamos aquí y encontramos la carpeta pero no la variante, devolver cualquier fuente de la carpeta como fallback
+                    $anyFont = array_merge(glob($famDir . '/*.ttf') ?: [], glob($famDir . '/*.otf') ?: []);
+                    if (!empty($anyFont)) {
+                        Log::warning("No se encontró variante exacta para $fontFamily $weight. Usando fallback genérico: " . basename($anyFont[0]));
+                        return $anyFont[0];
+                    }
+                    $anyStatic = array_merge(glob($famDir . '/static/*.ttf') ?: [], glob($famDir . '/static/*.otf') ?: []);
+                    if (!empty($anyStatic)) return $anyStatic[0];
+                }
+            }
+        }
+        
+        // Fallback a lógica legacy si no se encuentra carpeta
         $simple = $this->getFontPath($fontFamily);
         if ($simple) return $simple;
+        
+        // Fallback final sistema
         $arial = 'C:\\Windows\\Fonts\\arial.ttf';
         if (file_exists($arial)) return $arial;
+        
         return null;
     }
 

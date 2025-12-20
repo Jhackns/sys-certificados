@@ -86,11 +86,7 @@ class QRCodeService
         $qrImagePath = $this->createQRImage($certificate->verification_url, $certificate);
         $certificate->qr_image_path = $qrImagePath;
 
-        // Generar imagen final del certificado con QR y nombre
-        $finalImagePath = $this->generateFinalCertificateImage($certificate);
-        $certificate->final_image_path = $finalImagePath;
-
-        // Guardar cambios
+        // Guardar cambios del QR
         $certificate->save();
 
         return $qrImagePath;

@@ -61,7 +61,7 @@ export class TemplatesComponent implements OnInit {
   showEditor = signal(false);
   editorElements = signal<{ type: 'name' | 'date' | 'qr'; x: number; y: number; width?: number; height?: number; fontFamily?: string; fontSize?: number; rotation?: number; color?: string; fontWeight?: string }[]>([]);
   selectedElementIndex = signal<number | null>(null);
-  availableFonts = signal<string[]>([]);
+  availableFonts = signal<{ name: string; url: string | null }[]>([]);
   private fallbackFonts: string[] = [
     'Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana', 'Georgia', 'Trebuchet MS', 'Tahoma', 'Calibri', 'Cambria', 'Segoe UI', 'Garamond', 'Bookman', 'Palatino', 'Comic Sans MS'
   ];
@@ -254,15 +254,44 @@ export class TemplatesComponent implements OnInit {
   async loadAvailableFonts(): Promise<void> {
     try {
       const res = await this.templateService.getFonts().toPromise();
-      let fonts = res?.data?.fonts || [];
-      if (!fonts || fonts.length === 0) {
-        fonts = [...this.fallbackFonts];
+      if (res?.success && res.data && res.data.fonts) {
+        // Now returns {name, url}[]
+        const loadedFonts = res.data.fonts;
+
+        // Dynamically load fonts
+        const fontPromises = loadedFonts.map(async (fontObj) => {
+          if (fontObj.url) {
+            const fontName = fontObj.name;
+            // Check if already loaded
+            const isLoaded = Array.from(document.fonts).some(f => f.family === fontName);
+            if (!isLoaded) {
+              try {
+                const fontFace = new FontFace(fontName, `url(${fontObj.url})`);
+                const loadedFace = await fontFace.load();
+                document.fonts.add(loadedFace);
+              } catch (err) {
+                console.warn(`Error loading font ${fontName}:`, err);
+              }
+            }
+          }
+          return fontObj;
+        });
+
+        // Wait for all to try loading (optional, but good for UI consistency)
+        await Promise.all(fontPromises);
+
+        this.availableFonts.set(loadedFonts);
+      } else {
+        this.useFallbackFonts();
       }
-      const sorted = fonts.sort((a: string, b: string) => a.localeCompare(b));
-      this.availableFonts.set(sorted);
     } catch (e) {
-      this.availableFonts.set([...this.fallbackFonts]);
+      console.error('Error fetching fonts', e);
+      this.useFallbackFonts();
     }
+  }
+
+  private useFallbackFonts() {
+    this.availableFonts.set(this.fallbackFonts.map(f => ({ name: f, url: null })));
   }
 
   // Eliminado: el efecto ahora se declara como propiedad de clase

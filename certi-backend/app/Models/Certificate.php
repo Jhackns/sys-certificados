@@ -183,8 +183,8 @@ class Certificate extends Model
      */
     public function getQrContentUrl(): string
     {
-        // Retorna una URL que muestra el código único como texto (en una imagen)
-        // Usamos dummyimage para mostrar el texto "CERT-XXXX" en una imagen blanca
-        return "https://dummyimage.com/600x400/ffffff/000000&text=" . urlencode($this->unique_code);
+        // Retorna la URL pública de verificación que será codificada en el QR
+        $baseUrl = config('app.frontend_url', 'http://localhost:4200');
+        return rtrim($baseUrl, '/') . '/verificar/' . $this->unique_code;
     }
 }

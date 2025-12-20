@@ -57,7 +57,8 @@ class SendCertificateEmailJob implements ShouldQueue
                 Log::info('SendCertificateEmailJob: Imagen final no encontrada, generando...', ['certificate_id' => $certificate->id]);
                 
                 // Necesitamos el QR
-                $verificationUrl = url("/verify/{$certificate->unique_code}");
+                $frontendUrl = config('app.frontend_url', 'http://localhost:4200');
+                $verificationUrl = rtrim($frontendUrl, '/') . "/verificar/{$certificate->unique_code}";
                 $qrRelativePath = $qrService->generateQRCodeFromUrl($verificationUrl);
                 $qrAbsolutePath = $qrRelativePath ? storage_path('app/public/' . $qrRelativePath) : '';
 

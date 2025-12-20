@@ -1,0 +1,96 @@
+<div class="verification-container">
+    <div class="verification-card">
+
+        <!-- Header -->
+        <div class="card-header">
+            <div class="header-icon">
+                <i class="fas fa-certificate"></i>
+            </div>
+            <h2>Verificación de Certificado</h2>
+            <p>Sistema oficial de validación de documentos</p>
+        </div>
+
+        <div class="card-body">
+
+            <!-- Loading State -->
+            <div *ngIf="loading()" class="state-container">
+                <div class="spinner"></div>
+                <p>Verificando autenticidad...</p>
+            </div>
+
+            <!-- Error State -->
+            <div *ngIf="!loading() && error()" class="state-container error">
+                <div class="icon-circle error-icon">
+                    <i class="fas fa-times"></i>
+                </div>
+                <h3>Certificado No Encontrado</h3>
+                <p>{{ error() }}</p>
+                <button class="btn-primary" (click)="verifyCertificate()">Reintentar</button>
+            </div>
+
+            <!-- Success State -->
+            <div *ngIf="!loading() && certificate()" class="certificate-content animate-fade-in">
+
+                <div class="status-banner" [ngClass]="getStatusInfo().cssClass">
+                    <div class="icon-circle status-icon">
+                        <i [class]="getStatusInfo().icon"></i>
+                    </div>
+                    <div class="status-text">
+                        <h3>{{ getStatusInfo().label }}</h3>
+                        <span>{{ getStatusInfo().message }}</span>
+                    </div>
+                </div>
+                <div class="details-grid">
+                    <div class="detail-item full-width">
+                        <label>Código Único</label>
+                        <div class="value code-value">{{ certificate().code }}</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <label>Otorgado a</label>
+                        <div class="value highlight">{{ certificate().receptor }}</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <label>Curso / Evento</label>
+                        <div class="value">{{ certificate().curso }}</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <label>Fecha de Emisión</label>
+                        <div class="value">{{ certificate().fecha_emision }}</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <label>Emisor</label>
+                        <div class="value">{{ certificate().issuer }}</div>
+                    </div>
+
+                    <div class="detail-item full-width" *ngIf="certificate().descripcion">
+                        <label>Descripción</label>
+                        <div class="value small-text">{{ certificate().descripcion }}</div>
+                    </div>
+                </div>
+
+                <div class="actions-area">
+                    <button (click)="downloadOriginal()" class="btn-download">
+                        <i class="fas fa-file-pdf"></i>
+                        Descargar Certificado Original
+                    </button>
+                    <p class="verification-note">
+                        <i class="fas fa-info-circle"></i>
+                        Este documento digital es una representación válida del original custodiado en nuestros
+                        servidores.
+                    </p>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="card-footer">
+            <p>&copy; 2025 Certi-System. Todos los derechos reservados.</p>
+        </div>
+    </div>
+</div>

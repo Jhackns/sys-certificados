@@ -65,8 +65,8 @@ export class TemplateService {
     return this.http.get<ApiResponse<PaginatedResponse<Template>>>(this.apiUrl, { params });
   }
 
-  getFonts(): Observable<ApiResponse<{ fonts: string[] }>> {
-    return this.http.get<ApiResponse<{ fonts: string[] }>>(`${this.apiUrl}/fonts`);
+  getFonts(): Observable<ApiResponse<{ fonts: { name: string; url: string | null }[] }>> {
+    return this.http.get<ApiResponse<{ fonts: { name: string; url: string | null }[] }>>(`${this.apiUrl}/fonts`);
   }
 
   getTemplate(id: number): Observable<ApiResponse<{ template: Template }>> {
@@ -114,6 +114,6 @@ export class TemplateService {
   }): Observable<ApiResponse<{ template: Template }>> {
     return this.http.put<ApiResponse<{ template: Template }>>(`${this.apiUrl}/${id}/positions`, positions);
   }
-  
-  
+
+
 }

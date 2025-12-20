@@ -15,6 +15,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use App\Mail\CertificateGenerated;
 use Exception;
 
@@ -52,14 +53,25 @@ class GenerateCertificateJob implements ShouldQueue
         // Obtener el usuario
         $user = User::findOrFail($this->certificate->user_id);
 
-        // Generar URL para verificación (apuntando a qrserver como solicitó el usuario)
-        $verificationUrl = $this->certificate->getQrContentUrl();
-
-        // Generar QR
-        $qrRelativePath = $qrService->generateQRCodeFromUrl($verificationUrl);
-
-        // Convertir ruta relativa del QR a absoluta para el servicio de imagen
-        $qrAbsolutePath = $qrRelativePath ? storage_path('app/public/' . $qrRelativePath) : '';
+        // Generar o recuperar QR
+        $qrAbsolutePath = '';
+        if ($this->certificate->qr_image_path && Storage::disk('public')->exists($this->certificate->qr_image_path)) {
+             $qrAbsolutePath = storage_path('app/public/' . $this->certificate->qr_image_path);
+             Log::info('Usando QR existente', ['path' => $qrAbsolutePath]);
+        } else {
+             // Generar URL para verificación
+             $verificationUrl = $this->certificate->getQrContentUrl();
+             // Generar QR
+             $qrRelativePath = $qrService->generateQRCodeFromUrl($verificationUrl);
+             // Convertir ruta relativa del QR a absoluta
+             $qrAbsolutePath = $qrRelativePath ? storage_path('app/public/' . $qrRelativePath) : '';
+             
+             // Guardar el path generado en el certificado si no existía
+             if ($qrRelativePath) {
+                 $this->certificate->qr_image_path = $qrRelativePath;
+                 $this->certificate->save();
+             }
+        }
 
         // Generar imagen final del certificado (PNG) con nombre y QR
         $finalImageRelativePath = $imageService->generateFinalCertificateImage($this->certificate, $qrAbsolutePath);
@@ -74,9 +86,11 @@ class GenerateCertificateJob implements ShouldQueue
             ]);
         }
 
-        // Actualizar estado del certificado
-        $this->certificate->status = 'issued';
-        $this->certificate->save();
+        // Actualizar estado del certificado solo si está en borrador o procesando
+        if (in_array($this->certificate->status, ['draft', 'processing'])) {
+            $this->certificate->status = 'issued';
+            $this->certificate->save();
+        }
 
         Log::info('Certificado generado exitosamente (PNG)', [
             'certificate_id' => $this->certificate->id,

@@ -358,7 +358,8 @@
             <div style="display: flex; gap: 8px;">
               <select class="form-control" [value]="getSelected()?.fontFamily || ''" (change)="updateFontFamily($event)"
                 style="flex: 1;">
-                <option *ngFor="let font of availableFonts()" [value]="font">{{ font }}</option>
+                <option *ngFor="let font of availableFonts()" [value]="font.name" [style.fontFamily]="font.name">{{
+                  font.name }}</option>
               </select>
               <button class="btn-bold" [class.active]="getSelected()?.fontWeight === 'bold'"
                 (click)="updateFontWeight()" title="Negrita">

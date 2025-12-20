@@ -59,6 +59,10 @@ export const routes: Routes = [
   },
 
   {
+    path: 'verificar/:code',
+    loadComponent: () => import('./features/public/verification/verification.component').then(m => m.VerificationComponent)
+  },
+  {
     path: '404',
     loadComponent: () => import('./shared/components/not-found/not-found.component').then(m => m.NotFoundComponent)
   },

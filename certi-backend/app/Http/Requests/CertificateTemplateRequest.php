@@ -36,6 +36,7 @@ class CertificateTemplateRequest extends FormRequest
             'name_position.top' => 'sometimes|numeric',
             'name_position.fontSize' => 'sometimes|numeric|min:6|max:200',
             'name_position.fontFamily' => 'sometimes|string|max:100',
+            'name_position.font_family' => 'sometimes|string|max:100', // Allow snake_case
             'name_position.color' => 'sometimes|string|max:20',
             'name_position.rotation' => 'sometimes|numeric|min:-360|max:360',
             'name_position.textAlign' => 'sometimes|in:left,center,right',
@@ -58,6 +59,7 @@ class CertificateTemplateRequest extends FormRequest
             'date_position.top' => 'sometimes|numeric',
             'date_position.fontSize' => 'sometimes|numeric|min:6|max:200',
             'date_position.fontFamily' => 'sometimes|string|max:100',
+            'date_position.font_family' => 'sometimes|string|max:100', // Allow snake_case
             'date_position.color' => 'sometimes|string|max:20',
             'date_position.rotation' => 'sometimes|numeric|min:-360|max:360',
             'date_position.textAlign' => 'sometimes|in:left,center,right',

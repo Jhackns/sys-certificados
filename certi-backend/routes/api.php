@@ -43,7 +43,16 @@ Route::prefix('auth')->group(function () {
 Route::prefix('public')->group(function () {
     Route::post('/validate-certificate', [ValidationController::class, 'validateCertificate']);
     Route::get('/validation/{code}', [ValidationController::class, 'byCode']);
-    Route::get('/certificate/{code}', [CertificateController::class, 'byCode']);
+    Route::get('/certificate/{code}', [CertificateController::class, 'byCode']); // Legacy check
+    
+    // Nuevas rutas para Verificación Pública
+    Route::get('/certificates/{code}', [App\Http\Controllers\API\PublicCertificateController::class, 'verify']);
+    Route::get('/certificates/{code}/download', [App\Http\Controllers\API\PublicCertificateController::class, 'download']);
+    
+    // Proxy de fuentes (Público para evitar bloqueos CORS/Auth en frontend)
+    Route::get('/fonts/proxy', [CertificateTemplateController::class, 'proxyFont']);
+    // Proxy de imágenes (Para editor y html2canvas)
+    Route::get('/images/proxy', [CertificateTemplateController::class, 'proxyImage']);
 });
 
 /*

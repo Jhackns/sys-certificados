@@ -115,26 +115,180 @@ class CertificateTemplateController extends Controller
     /**
      * Listar fuentes disponibles desde storage/app/fonts
      */
+    /**
+     * Listar fuentes disponibles
+     * Escanea public/fonts y storage/app/public/fonts buscando carpetas y archivos.
+     */
+    /**
+     * Proxy para servir fuentes con cabeceras CORS correctas
+     */
+    public function proxyFont(\Illuminate\Http\Request $request)
+    {
+        $path = $request->query('path');
+        if (!$path) return response()->json(['error' => 'Path required'], 400);
+
+        // Security check: prevent directory traversal
+        if (str_contains($path, '..')) return response()->json(['error' => 'Invalid path'], 403);
+
+        $absPath = null;
+        
+        // 1. Check inside public/fonts
+        if (str_starts_with($path, 'fonts/')) {
+            $candidate = public_path($path);
+            if (str_starts_with(realpath($candidate), realpath(public_path('fonts'))) && file_exists($candidate)) {
+                $absPath = $candidate;
+            }
+        }
+        
+        // 2. Check inside storage/app/public/fonts (mapped as storage/fonts/...)
+        if (!$absPath && str_starts_with($path, 'storage/fonts/')) {
+            $realRel = str_replace('storage/fonts/', '', $path);
+            $candidate = storage_path('app/public/fonts/' . $realRel);
+            // Verify it is inside storage/app/public/fonts
+            $baseStoragePos = realpath(storage_path('app/public/fonts'));
+            if ($baseStoragePos && str_starts_with(realpath($candidate), $baseStoragePos) && file_exists($candidate)) {
+                $absPath = $candidate;
+            }
+        }
+
+        if ($absPath && file_exists($absPath)) {
+            $mimeType = mime_content_type($absPath);
+            if (!$mimeType) $mimeType = 'font/ttf'; // Fallback
+            
+            return response()->file($absPath, [
+                'Access-Control-Allow-Origin' => '*',
+                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Content-Type, X-Auth-Token, Origin, Authorization',
+                'Content-Type' => $mimeType
+            ]);
+        }
+
+        return response()->json(['error' => 'Font not found'], 404);
+    }
+
+    /**
+     * Proxy para servir imágenes de plantillas con CORS
+     */
+    public function proxyImage(\Illuminate\Http\Request $request)
+    {
+        $path = $request->query('path');
+        if (!$path) return response()->json(['error' => 'Path required'], 400);
+
+        // Security: prevent traversal
+        if (str_contains($path, '..')) return response()->json(['error' => 'Invalid path'], 403);
+
+        // Normalize path: ignore 'storage/' prefix if sent
+        $relPath = $path;
+        if (str_starts_with($path, 'storage/')) {
+            $relPath = substr($path, 8);
+        }
+
+        // Check in public disk (where templates are stored)
+        if (Storage::disk('public')->exists($relPath)) {
+            $absPath = Storage::disk('public')->path($relPath);
+            $mimeType = mime_content_type($absPath);
+            
+            return response()->file($absPath, [
+                'Access-Control-Allow-Origin' => '*',
+                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Content-Type, X-Auth-Token, Origin, Authorization',
+                'Content-Type' => $mimeType
+            ]);
+        }
+        
+        // Check certificates disk
+        if (Storage::disk('certificates')->exists($relPath)) {
+             $absPath = Storage::disk('certificates')->path($relPath);
+             $mimeType = mime_content_type($absPath);
+             return response()->file($absPath, [
+                'Access-Control-Allow-Origin' => '*',
+                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Content-Type, X-Auth-Token, Origin, Authorization',
+                'Content-Type' => $mimeType
+            ]);
+        }
+
+        return response()->json(['error' => 'Image not found'], 404);
+    }
+
+
     public function fonts(): JsonResponse
     {
         try {
-            $dir1 = storage_path('app/fonts');
-            $dir2 = storage_path('app/public/fonts');
-            $fonts = [];
-            foreach ([$dir1, $dir2] as $dir) {
-                if (is_dir($dir)) {
-                    $files = array_merge(glob($dir . '/*.ttf') ?: [], glob($dir . '/*.otf') ?: []);
-                    foreach ($files as $file) {
-                        $base = pathinfo($file, PATHINFO_FILENAME);
-                        $name = trim(preg_replace('/[_-]+/', ' ', $base));
-                        $name = preg_replace('/\s+/', ' ', $name);
-                        $fonts[] = $name;
+            $fontsMap = []; // Key: Name, Value: URL
+            
+            // Helper para buscar archivo Regular/Normal para la preview
+            $findRegularFile = function ($dir) {
+                // Patrones prioritarios
+                $patterns = [
+                    '/*Regular.ttf', '/*-Regular.ttf', '/*_Regular.ttf', 
+                    '/*Normal.ttf', '/*-Normal.ttf',
+                    '/*.ttf' // Fallback a cualquiera
+                ];
+                foreach ($patterns as $pattern) {
+                    $matches = glob($dir . $pattern);
+                    if ($matches) return $matches[0];
+                    // Probar carpeta static si existe
+                    $matchesStatic = glob($dir . '/static' . $pattern);
+                    if ($matchesStatic) return $matchesStatic[0];
+                }
+                return null;
+            };
+
+            // 1. Escanear public/fonts (Prioridad 1)
+            $publicFontsDir = public_path('fonts');
+            if (is_dir($publicFontsDir)) {
+                $subdirs = glob($publicFontsDir . '/*', GLOB_ONLYDIR);
+                foreach ($subdirs as $subdir) {
+                    $dirname = basename($subdir);
+                    $name = trim(str_replace(['_', '-'], ' ', $dirname));
+                    if (!$name) continue;
+
+                    // Buscar archivo para URL
+                    $file = $findRegularFile($subdir);
+                    if ($file) {
+                        // Generar URL PROXY
+                        $relativePath = str_replace(public_path() . DIRECTORY_SEPARATOR, '', $file);
+                        $relativePath = str_replace('\\', '/', $relativePath); // Fix Windows paths
+                        // URL: /api/public/fonts/proxy?path=fonts/Unna/Unna-Regular.ttf
+                        // Usamos url() helper apuntando a la ruta pública
+                        $url = url('api/public/fonts/proxy') . '?path=' . urlencode($relativePath);
+                        $fontsMap[$name] = $url;
+                    } else {
+                        $fontsMap[$name] = null;
                     }
                 }
             }
-            sort($fonts, SORT_NATURAL | SORT_FLAG_CASE);
-            $fonts = array_values(array_unique($fonts));
-            return $this->successResponse([ 'fonts' => $fonts ], 'Fuentes disponibles obtenidas correctamente');
+
+            // 2. Escanear storage/app/public/fonts (Prioridad 2)
+            $storagePublicDir = storage_path('app/public/fonts');
+            if (is_dir($storagePublicDir)) {
+                // Archivos sueltos (.ttf)
+                $files = array_merge(glob($storagePublicDir . '/*.ttf') ?: [], glob($storagePublicDir . '/*.otf') ?: []);
+                foreach ($files as $file) {
+                    $base = pathinfo($file, PATHINFO_FILENAME);
+                    $name = trim(preg_replace('/[_-]+/', ' ', $base));
+                    $name = preg_replace('/\s*(Regular|Bold|Italic|Medium|Light|Thin|SemiBold|ExtraBold|Black)\s*/i', '', $name);
+                    
+                    if ($name && !isset($fontsMap[$name])) {
+                        $relativePath = 'storage/fonts/' . basename($file);
+                        $url = url('api/public/fonts/proxy') . '?path=' . urlencode($relativePath);
+                        $fontsMap[$name] = $url; 
+                    }
+                }
+            }
+
+            // Formatear respuesta
+            $fontsList = [];
+            ksort($fontsMap, SORT_NATURAL | SORT_FLAG_CASE);
+            foreach ($fontsMap as $name => $url) {
+                $fontsList[] = [
+                    'name' => $name,
+                    'url' => $url
+                ];
+            }
+
+            return $this->successResponse([ 'fonts' => $fontsList ], 'Fuentes disponibles obtenidas correctamente');
         } catch (\Throwable $e) {
             Log::error('Error al listar fuentes: ' . $e->getMessage());
             return $this->errorResponse('Error al listar fuentes', Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -267,7 +421,14 @@ class CertificateTemplateController extends Controller
                 ->withCount('certificates')
                 ->findOrFail($id);
 
-            $computedUrl = $template->file_path ? $this->fileService->getPublicUrl($template->file_path) : null;
+            // Use the proxy URL instead of the direct asset URL to avoid CORS issues in editor
+            $computedUrl = null;
+            if ($template->file_path) {
+                // Generate proxy URL: /api/public/images/proxy?path=...
+                // Using 'images/proxy' to match the method proxyImage
+                $computedUrl = url('api/public/images/proxy') . '?path=' . urlencode($template->file_path);
+            }
+
             Log::info('Plantilla::show', [
                 'id' => $template->id,
                 'file_path' => $template->file_path,

@@ -768,9 +768,18 @@ class CertificateController extends Controller
             if (!$finalImageAbsolute || !file_exists($finalImageAbsolute)) {
                 Log::info('Imagen final no encontrada, generando al vuelo...', ['certificate_id' => $certificate->id]);
                 
-                // Necesitamos el QR
-                $verificationUrl = url("/verify/{$certificate->unique_code}");
-                $qrRelativePath = $this->qrService->generateQRCodeFromUrl($verificationUrl);
+                // Necesitamos el QR (si no existe, se generará)
+                $qrRelativePath = $certificate->qr_image_path;
+                
+                // Validar existencia de QR
+                if (!$qrRelativePath || !Storage::disk('public')->exists($qrRelativePath)) {
+                    $frontendUrl = config('app.frontend_url', 'http://localhost:4200');
+                    $verificationUrl = rtrim($frontendUrl, '/') . "/verificar/{$certificate->unique_code}";
+                    $qrRelativePath = $this->qrService->generateQRCodeFromUrl($verificationUrl);
+                    $certificate->qr_image_path = $qrRelativePath;
+                    $certificate->save();
+                }
+
                 $qrAbsolutePath = $qrRelativePath ? storage_path('app/public/' . $qrRelativePath) : '';
 
                 // Generar imagen
@@ -866,8 +875,15 @@ class CertificateController extends Controller
                 Log::info('Imagen final no encontrada para email, generando al vuelo...', ['certificate_id' => $certificate->id]);
                 
                 // Necesitamos el QR
-                $verificationUrl = url("/verify/{$certificate->unique_code}");
-                $qrRelativePath = $this->qrService->generateQRCodeFromUrl($verificationUrl);
+                $qrRelativePath = $certificate->qr_image_path;
+
+                 if (!$qrRelativePath || !Storage::disk('public')->exists($qrRelativePath)) {
+                    $verificationUrl = url("/verify/{$certificate->unique_code}");
+                    $qrRelativePath = $this->qrService->generateQRCodeFromUrl($verificationUrl);
+                    $certificate->qr_image_path = $qrRelativePath;
+                    $certificate->save();
+                }
+
                 $qrAbsolutePath = $qrRelativePath ? storage_path('app/public/' . $qrRelativePath) : '';
 
                 // Generar imagen
@@ -972,11 +988,41 @@ class CertificateController extends Controller
             }
 
             // Generar URL de vista previa
-            // Preferir imagen final generada; si no existe, usar imagen de plantilla pública
+            // Preferir imagen final generada; si no existe, regenerar
             $previewUrl = null;
-            if ($certificate->final_image_path && Storage::disk('public')->exists($certificate->final_image_path)) {
-                $previewUrl = asset('storage/' . $certificate->final_image_path);
+            $finalImagePath = $certificate->final_image_path;
+            
+            // Verificar si existe el archivo físico
+            if (!$finalImagePath || !Storage::disk('public')->exists($finalImagePath)) {
+                Log::info('Imagen final no encontrada en preview, regenerando...', ['certificate_id' => $certificate->id]);
+                
+                // Regenerar imagen
+                // Necesitamos el QR (si no existe, se generará)
+                $qrService = app(\App\Services\QRCodeService::class);
+                $qrRelativePath = $certificate->qr_image_path;
+                
+                if (!$qrRelativePath || !Storage::disk('public')->exists($qrRelativePath)) {
+                     $verificationUrl = $certificate->getQrContentUrl(); // Asegurar método correcto
+                     $qrRelativePath = $qrService->generateQRCodeFromUrl($verificationUrl);
+                     $certificate->qr_image_path = $qrRelativePath;
+                     $certificate->save();
+                }
+                
+                $qrAbsolutePath = $qrRelativePath ? storage_path('app/public/' . $qrRelativePath) : '';
+                
+                $imageService = app(\App\Services\CertificateImageService::class);
+                $finalImagePath = $imageService->generateFinalCertificateImage($certificate, $qrAbsolutePath);
+                
+                if ($finalImagePath) {
+                    $certificate->final_image_path = $finalImagePath;
+                    $certificate->save();
+                }
+            }
+
+            if ($finalImagePath && Storage::disk('public')->exists($finalImagePath)) {
+                $previewUrl = asset('storage/' . $finalImagePath);
             } elseif ($template->file_path) {
+                // Fallback a solo plantilla si falla todo
                 $previewUrl = asset('storage/' . $template->file_path);
             }
 
