@@ -334,21 +334,57 @@ class CertificateImageService
             $align = strtolower($position['textAlign'] ?? 'left');
             $vAlign = strtolower($position['verticalAlign'] ?? 'top');
             $rotation = (float)($position['rotation'] ?? 0);
+
+            // Obtener ruta de fuente antes para decidir si aplicar Fake Bold
+            $fontPath = $fontFamily ? $this->getFontVariantPath($fontFamily, $fontWeight, null) : null;
             
-            $image->text($name, $x, $y, function ($font) use ($fontSize, $fontFamily, $fontWeight, $color, $rotation, $align, $vAlign) {
-                $font->size($fontSize);
-                $font->color($color);
-                $fontPath = $fontFamily ? $this->getFontVariantPath($fontFamily, $fontWeight, null) : null;
-                if ($fontPath) {
-                    $font->file($fontPath);
+            // Detectar necesidad de "Falso Negrita" (Synthetic Bold)
+            // Si se pide negrita (Bold, 600+) pero el archivo obtenido NO parece ser negrita (Regular, etc.)
+            $w = strtolower(trim($fontWeight));
+            $isRequestBold = str_contains($w, 'bold') || in_array($w, ['500', '600', '700', '800', '900', 'bolder', 'medium', 'semibold']);
+            
+            $isFileBold = false;
+            if ($fontPath) {
+                $base = strtolower(basename($fontPath));
+                $isFileBold = str_contains($base, 'bold') || str_contains($base, 'semib') || str_contains($base, 'medium');
+            }
+            
+            // Aplicar Falso Negrita si se pide Bold pero el archivo no lo es
+            $applyFauxBold = $isRequestBold && !$isFileBold;
+            
+            // Función interna para dibujar el texto
+            $drawText = function($offsetX, $offsetY) use ($image, $name, $x, $y, $fontSize, $fontFamily, $fontWeight, $color, $rotation, $align, $vAlign, $fontPath) {
+                 $image->text($name, $x + $offsetX, $y + $offsetY, function ($font) use ($fontSize, $fontFamily, $fontWeight, $color, $rotation, $align, $vAlign, $fontPath) {
+                    $font->size($fontSize);
+                    $font->color($color);
+                    if ($fontPath) {
+                        $font->file($fontPath);
+                    }
+                    if (abs($rotation) > 0.01) {
+                        $font->angle($rotation);
+                    }
+                    $font->align($align === 'center' ? 'center' : ($align === 'right' ? 'right' : 'left'));
+                    $font->valign($vAlign === 'middle' ? 'middle' : ($vAlign === 'bottom' ? 'bottom' : 'top'));
+                });
+            };
+
+            // Dibujar texto base
+            $drawText(0, 0);
+
+            if ($applyFauxBold) {
+                // Calcular offset proporcional al tamaño de fuente
+                // Un offset de ~1/30 del tamaño de fuente suele funcionar bien para negrita
+                $offset = max(1, round($fontSize / 30));
+                
+                Log::info("Aplicando Falso Negrita (Synthetic Bold)", ['offset' => $offset, 'font' => basename($fontPath)]);
+                
+                // Dibujar con desplazamiento horizontal para simular grosor
+                $drawText($offset, 0);
+                // Opcional: un paso intermedio para suavizar si el offset es grande
+                if ($offset > 1) {
+                    $drawText($offset / 2.0, 0);
                 }
-                if (abs($rotation) > 0.01) {
-                    $font->angle($rotation);
-                }
-                // Usar alineación explícita acorde al frontend (Top/Left por defecto)
-                $font->align($align === 'center' ? 'center' : ($align === 'right' ? 'right' : 'left'));
-                $font->valign($vAlign === 'middle' ? 'middle' : ($vAlign === 'bottom' ? 'bottom' : 'top'));
-            });
+            }
 
             Log::info('Nombre añadido a la imagen del certificado', [
                 'name' => $name,
@@ -356,7 +392,8 @@ class CertificateImageService
                 'x' => $x,
                 'y' => $y,
                 'font_size' => $fontSize,
-                'scale_used' => $scale
+                'scale_used' => $scale,
+                'faux_bold' => $applyFauxBold
             ]);
 
         } catch (\Exception $e) {
@@ -758,9 +795,11 @@ class CertificateImageService
      */
     private function getFontVariantPath(string $fontFamily, ?string $fontWeight, ?string $fontStyle): ?string
     {
-        $weight = strtolower($fontWeight ?? 'normal');
-        $style = strtolower($fontStyle ?? 'normal');
+        $weight = strtolower(trim($fontWeight ?? 'normal'));
+        $style = strtolower(trim($fontStyle ?? 'normal'));
         $originalFamily = trim($fontFamily);
+        
+        Log::info("Buscando fuente: Fam='$originalFamily', W='$weight', S='$style'");
         
         // Normalizar nombre de familia para búsqueda de directorios (Great Vibes -> Great_Vibes)
         // Intentar ambas variantes: con espacios y con guiones bajos
@@ -781,15 +820,19 @@ class CertificateImageService
         ];
 
         // Determinar sufijos buscados según peso/estilo
-        // Ej: Bold Italic -> ["BoldItalic", "Bold-Italic", "Bold Italic", "Bi", "z", "Bold", "Italic"]
         $suffixes = [];
-        $isBold = str_contains($weight, 'bold') || $weight === '700' || $weight === '800' || $weight === '900';
-        $isItalic = $style === 'italic';
+        // Considerar 600 (SemiBold), 500 (Medium) y 'bold' como triggers para buscar variantes negritas
+        $isBold = str_contains($weight, 'bold') || in_array($weight, ['500', '600', '700', '800', '900', 'bolder', 'medium', 'semibold']);
+        $isItalic = str_contains($style, 'italic') || $style === 'oblique';
         
         if ($isBold && $isItalic) {
             $suffixes = ['BoldItalic', 'Bold-Italic', 'Bold_Italic', 'Bold Italic', 'Bi', 'z', '-BoldItalic'];
         } elseif ($isBold) {
-            $suffixes = ['Bold', '-Bold', '_Bold', 'b', 'Bd'];
+            // Priorizar Medium/SemiBold si es lo que se pidió
+            if (in_array($weight, ['500', 'medium'])) array_push($suffixes, 'Medium', '-Medium');
+            if (in_array($weight, ['600', 'semibold'])) array_push($suffixes, 'SemiBold', '-SemiBold');
+            
+            array_push($suffixes, 'Bold', '-Bold', '_Bold', 'b', 'Bd');
         } elseif ($isItalic) {
             $suffixes = ['Italic', '-Italic', '_Italic', 'i', 'It'];
         } else {
